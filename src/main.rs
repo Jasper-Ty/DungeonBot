@@ -1,46 +1,54 @@
 use std::sync::Arc;
-use tokio::sync::Mutex; // Need async Mutex, will be holding across awaits
 use std::fs;
+use tokio::sync::Mutex; // Need async Mutex, will be holding across awaits
 
 use toml::Table;
-use serenity::all::{ChannelId, Member, Message, RoleId};
+use serenity::all::{ChannelId, Member, Message, RoleId, Timestamp};
 use serenity::async_trait;
 use serenity::prelude::*;
 
 // I really *shouldn't* have members in this struct at all,
 // but it's a convenient solution for now
-struct Handler {
+struct LastMessageHandler {
     last_message_channel_id: ChannelId,
     last_message_role_id: RoleId,
+}
+
+
+struct LastMessageData {
+    memb: Member,
+    timestamp: Timestamp,
 }
 
 // Holds the user id of the current Last Message Winner
 // Serenity uses unit structs to set up the type system for
 // their global data dictionary (data member in Context)
 // (Very TypeScript-y business!)
-struct LastMessageWinner;
-impl TypeMapKey for LastMessageWinner {
-    type Value = Arc<Mutex<Option<Member>>>;
+struct LastMessage;
+impl TypeMapKey for LastMessage {
+    type Value = Arc<Mutex<Option<LastMessageData>>>;
 }
 
 // The message handler that processes every message in #last-message,
 // and updates roles accordingly.
 #[async_trait]
-impl EventHandler for Handler {
+impl EventHandler for LastMessageHandler {
     async fn message(&self, ctx: Context, msg: Message) {
 
         // Don't care if it's not in the right channel!
         if msg.channel_id != self.last_message_channel_id { return }
+        // No bots!
+        if msg.author.bot { return }
 
         // Acquire mutex
         let data_read = ctx.data.read().await;
-        let mtx = data_read.get::<LastMessageWinner>()
+        let mtx = data_read.get::<LastMessage>()
             .expect("Expected LastMessageWinner in TypeMap.")
             .clone();
-        let mut mtx_lock = mtx.lock().await;
+        let mut lmdata = mtx.lock().await;
 
         // Retrieve the guild member of the message author
-        let Ok(new_winner) = msg.member(&ctx.http).await else { return };
+        let Ok(new) = msg.member(&ctx.http).await else { return };
 
         /* Two steps (2 http requests) to update last message winner:
          *
@@ -58,31 +66,55 @@ impl EventHandler for Handler {
          */
 
         // (a)
-        if let Some(curr_winner) = &mtx_lock.as_ref() {
+        if let Some(LastMessageData {
+            memb: curr,
+            timestamp,
+        }) = lmdata.as_ref() {
+
+            let dt = {
+                let t0 = timestamp.timestamp();
+                let t1 = msg.timestamp.timestamp();
+                t1 - t0
+            };
+            let name = curr.display_name().to_string();
+
             // No-op if winner hasn't changed
-            if curr_winner.user.id == new_winner.user.id {
+            if curr.user.id == new.user.id {
                 return 
             }
 
             // Remove previous winner from role
-            if let Err(e) = curr_winner.remove_role(&ctx.http, self.last_message_role_id).await {
+            if let Err(e) = curr.remove_role(&ctx.http, self.last_message_role_id).await {
                 println!("Error removing role: {:?}", e);
                 return
             }
+
             // Update value in mutex
-            *mtx_lock = None;
-        }
+            *lmdata = None;
+
+            if dt >= 600 {
+                if let Err(e) = msg.channel_id.say(
+                    &ctx.http, 
+                    format!("😱! {} held the last message for {} seconds", name, dt)
+                ).await {
+                    println!("Error sending message {:?}", e);
+                }
+            }
+        } 
 
         // (b)
         {
             // Add new winner to role
-            if let Err(e) = new_winner.add_role(&ctx.http, self.last_message_role_id).await {
+            if let Err(e) = new.add_role(&ctx.http, self.last_message_role_id).await {
                 println!("Error adding role: {:?}", e);
                 return
             }
 
             // Update value in mutex
-            *mtx_lock = Some(new_winner);
+            *lmdata = Some(LastMessageData {
+                memb: new,
+                timestamp: msg.timestamp
+            });
         }
     }
 }
@@ -104,7 +136,7 @@ async fn main() {
         | GatewayIntents::DIRECT_MESSAGES 
         | GatewayIntents::MESSAGE_CONTENT;
 
-    let handler = Handler {
+    let handler = LastMessageHandler {
         last_message_channel_id: ChannelId::new(last_message_channel_id),
         last_message_role_id: RoleId::new(last_message_role_id),
     };
@@ -118,7 +150,7 @@ async fn main() {
     // Add LastMessageWinner to the global data dictionary
     {
         let mut data = client.data.write().await;
-        data.insert::<LastMessageWinner>(Arc::new(Mutex::new(None)));
+        data.insert::<LastMessage>(Arc::new(Mutex::new(None)));
     }
 
     // Let's go!
