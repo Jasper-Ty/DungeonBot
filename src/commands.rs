@@ -21,15 +21,20 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
 ]
 pub async fn leaderboard(
     ctx: Context<'_>,
-    #[description = "Page number"] page: Option<i64>
+    #[description = "Page number"] page: Option<u64>
 ) -> Result<(), Error> {
     let mut output: String = String::new();
+
+    let pagenum = page.unwrap_or(1) as i64;
+    let pagestr = format!("page {}", pagenum);
+
+    output.push_str(&format!("Leaderboard {:>33}\n", pagestr));
+    output.push_str("=============================================\n");
     output.push_str("Rank Username                            Aura\n");
 
     let connection = &mut establish_connection();
 
-    let offset = page.unwrap_or(0) * 10;
-
+    let offset = (pagenum-1) * 10;
     let mut i = offset + 1;
     for user in top_users(connection, 10, offset) {
         let User {
