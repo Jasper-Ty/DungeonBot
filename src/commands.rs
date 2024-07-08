@@ -1,7 +1,7 @@
 use crate::{establish_connection, get_users};
+use crate::Error;
 
 pub struct Data;
-type Error = Box<dyn std::error::Error + Send + Sync>;
 type Context<'a> = poise::Context<'a, Data, Error>;
 
 #[poise::command(slash_command, prefix_command)]

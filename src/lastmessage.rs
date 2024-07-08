@@ -5,9 +5,9 @@ use serenity::prelude::*;
 use serenity::async_trait;
 use serenity::all::{Message, RoleId, ChannelId, Member, Timestamp};
 
-use std::env;
 use dotenvy::dotenv;
 
+use crate::env_snowflake;
 use crate::{new_user, establish_connection};
 
 pub struct LastMessageHandler;
@@ -38,20 +38,13 @@ impl EventHandler for LastMessageHandler {
     async fn message(&self, ctx: Context, msg: Message) {
 
         dotenv().ok();
-        let last_message_channel_id = { 
-            let s = env::var("LAST_MESSAGE_CHANNEL_ID")
-                .expect("LAST_MESSAGE_CHANNEL_ID must be set");
-            let u = s.parse::<u64>()
-                .expect("LAST_MESSAGE_CHANNEL_ID is not an integer");
-            ChannelId::new(u)
-        };
-        let last_message_role_id = { 
-            let s = env::var("LAST_MESSAGE_ROLE_ID")
-                .expect("LAST_MESSAGE_ROLE_ID must be set");
-            let u = s.parse::<u64>()
-                .expect("LAST_MESSAGE_ROLE_ID is not an integer");
-            RoleId::new(u)
-        };
+        let last_message_channel_id: ChannelId = 
+            env_snowflake("LAST_MESSAGE_CHANNEL_ID")
+            .expect("Unable to get Last Message Channel Id");
+        let last_message_role_id: RoleId = 
+            env_snowflake("LAST_MESSAGE_ROLE_ID")
+            .expect("Unable to get Last Message Role Id");
+
         let connection = &mut establish_connection();
 
         // Don't care if it's not in the right channel!
@@ -59,6 +52,7 @@ impl EventHandler for LastMessageHandler {
         // No bots!
         if msg.author.bot { return }
 
+        // Insert into database
         new_user(connection, msg.author.id.into());
 
         // Acquire mutex
@@ -137,6 +131,9 @@ impl EventHandler for LastMessageHandler {
                 timestamp: msg.timestamp
             });
         }
+
+
+
     }
 }
 

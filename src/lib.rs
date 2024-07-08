@@ -9,6 +9,9 @@ use diesel::prelude::*;
 use dotenvy::dotenv;
 use std::env;
 
+type Error = Box<dyn std::error::Error + Send + Sync>;
+type Result<T> = core::result::Result<T, Error>;
+
 pub fn establish_connection() -> SqliteConnection {
     dotenv().ok();
 
@@ -44,4 +47,13 @@ pub fn get_users(conn: &mut SqliteConnection) -> Vec<User> {
         .select(User::as_select())
         .load(conn)
         .expect("Error loading users")
+}
+
+/// Convenience function for getting a type whose underlying
+/// id data type is a snowflake (e.g a user id).
+pub fn env_snowflake<T: From<u64>> (key: &str) -> Result<T> {
+    Ok(T::from(
+        env::var(key)?
+        .parse::<u64>()?
+    ))
 }
