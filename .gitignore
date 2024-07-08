@@ -1,3 +1,4 @@
 /target
 secrets.toml
+dungeon.db
 .env
