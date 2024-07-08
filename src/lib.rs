@@ -52,16 +52,6 @@ pub fn add_points(conn: &mut SqliteConnection, user_id: u64, pts: i32) {
         .expect("Error adding points");
 }
 
-pub fn get_users(conn: &mut SqliteConnection) -> Vec<User> {
-    use schema::users::dsl::*;
-
-    users 
-        .limit(10)
-        .select(User::as_select())
-        .load(conn)
-        .expect("Error loading users")
-}
-
 pub fn top_users(conn: &mut SqliteConnection, lim: i64, off: i64) -> Vec<User> {
     use schema::users::dsl::*;
 
