@@ -9,6 +9,7 @@ use dotenvy::dotenv;
 
 use crate::add_points;
 use crate::env_snowflake;
+use crate::hms;
 use crate::{new_user, establish_connection};
 
 pub struct LastMessageHandler;
@@ -92,7 +93,8 @@ impl EventHandler for LastMessageHandler {
                 let t1 = msg.timestamp.timestamp();
                 t1 - t0
             };
-            let name = curr.display_name().to_string();
+            let curr_name = curr.display_name().to_string();
+            let new_name = new.display_name().to_string();
 
             // No-op if winner hasn't changed
             if curr.user.id == new.user.id {
@@ -111,10 +113,10 @@ impl EventHandler for LastMessageHandler {
             // Update value in mutex
             *lmdata = None;
 
-            if dt >= 600 {
+            if dt >= 300 {
                 if let Err(e) = msg.channel_id.say(
                     &ctx.http, 
-                    format!("😱! {} held the last message for {} seconds", name, dt)
+                    format!("😱 {} broke {}'s {} last message streak!", new_name, curr_name, hms(dt))
                 ).await {
                     println!("Error sending message {:?}", e);
                 }

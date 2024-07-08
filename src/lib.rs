@@ -72,3 +72,11 @@ pub fn env_snowflake<T: From<u64>> (key: &str) -> Result<T> {
         .parse::<u64>()?
     ))
 }
+
+/// hh:mm:ss convenience function
+pub fn hms(seconds: i64) -> String {
+    let s = seconds % 60;
+    let m = (seconds / 60) % 60; 
+    let h = (seconds / 3600) % 60; 
+    format!("{:02}:{:02}:{:02}", h, m, s)
+}
