@@ -7,6 +7,7 @@ use serenity::all::{Message, RoleId, ChannelId, Member, Timestamp};
 
 use dotenvy::dotenv;
 
+use crate::add_points;
 use crate::env_snowflake;
 use crate::{new_user, establish_connection};
 
@@ -104,6 +105,9 @@ impl EventHandler for LastMessageHandler {
                 return
             }
 
+            // Update database value
+            add_points(connection, curr.user.id.into(), (dt/5) as i32);
+
             // Update value in mutex
             *lmdata = None;
 
@@ -131,9 +135,5 @@ impl EventHandler for LastMessageHandler {
                 timestamp: msg.timestamp
             });
         }
-
-
-
     }
 }
-

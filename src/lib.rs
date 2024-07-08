@@ -24,13 +24,14 @@ pub fn establish_connection() -> SqliteConnection {
 use models::User;
 
 pub fn new_user(conn: &mut SqliteConnection, user_id: u64) -> Option<User> {
-    use schema::users;
+    use schema::users::dsl::*;
+    let user_id = user_id as i64;
 
-    let new_user = models::NewUser { id: user_id as i64 };
+    let new_user = models::NewUser { id: user_id };
 
-    diesel::insert_into(users::table)
+    diesel::insert_into(users)
         .values(&new_user)
-        .on_conflict(users::id)
+        .on_conflict(id)
         .do_nothing()
         .returning(models::User::as_returning())
         .get_result(conn)
@@ -39,12 +40,36 @@ pub fn new_user(conn: &mut SqliteConnection, user_id: u64) -> Option<User> {
         .flatten()
 }
 
+/// Adds `points` points to user `user_id`.
+pub fn add_points(conn: &mut SqliteConnection, user_id: u64, pts: i32) {
+    use schema::users::dsl::*;
+    let user_id = user_id as i64;
+
+    diesel::update(users)
+        .filter(id.eq(user_id))
+        .set(points.eq(points + pts))
+        .execute(conn)
+        .expect("Error adding points");
+}
+
 pub fn get_users(conn: &mut SqliteConnection) -> Vec<User> {
     use schema::users::dsl::*;
 
     users 
         .limit(10)
         .select(User::as_select())
+        .load(conn)
+        .expect("Error loading users")
+}
+
+pub fn top_users(conn: &mut SqliteConnection, lim: i64, off: i64) -> Vec<User> {
+    use schema::users::dsl::*;
+
+    users 
+        .limit(lim)
+        .offset(off)
+        .order_by(points.desc())
+        .select((id, points))
         .load(conn)
         .expect("Error loading users")
 }
