@@ -14,7 +14,7 @@ use diesel::prelude::*;
 use db::{models, schema};
 use error::{DungeonBotError, Result};
 
-pub fn establish_connection() -> SqliteConnection {
+pub fn db_conn() -> SqliteConnection {
     dotenv().ok();
 
     let database_url = env::var("DATABASE_URL")

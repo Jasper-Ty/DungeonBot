@@ -1,7 +1,7 @@
 use serenity::all::UserId;
 
 use crate::models::User;
-use crate::{establish_connection, get_user, top_users};
+use crate::{db_conn, get_user, top_users};
 use crate::error::{DungeonBotError, Result};
 
 pub struct Data;
@@ -32,7 +32,7 @@ pub async fn leaderboard(
     output.push_str("=============================================\n");
     output.push_str("Rank Username                            Aura\n");
 
-    let connection = &mut establish_connection();
+    let connection = &mut db_conn();
 
     let offset = (pagenum-1) * 10;
     let mut i = offset + 1;
@@ -66,7 +66,7 @@ pub async fn leaderboard(
 pub async fn aura(ctx: Context<'_>) -> Result<()> {
     let author = ctx.author();
     let user_id: u64 = author.id.into();
-    let connection = &mut establish_connection();
+    let connection = &mut db_conn();
 
     // Retrieve points from db
     let User {

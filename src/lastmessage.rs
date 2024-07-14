@@ -10,7 +10,7 @@ use dotenvy::dotenv;
 use crate::add_points;
 use crate::env_snowflake;
 use crate::hms;
-use crate::{new_user, establish_connection};
+use crate::{new_user, db_conn};
 
 pub struct LastMessageHandler;
 
@@ -47,7 +47,7 @@ impl EventHandler for LastMessageHandler {
             env_snowflake("LAST_MESSAGE_ROLE_ID")
             .expect("Unable to get Last Message Role Id");
 
-        let connection = &mut establish_connection();
+        let connection = &mut db_conn();
 
         // Don't care if it's not in the right channel!
         if msg.channel_id != last_message_channel_id { return }
