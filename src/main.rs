@@ -7,7 +7,7 @@ use poise::serenity_prelude as serenity;
 use serenity::prelude::*;
 
 use dungeonbot::lastmessage::{install_lastmessage_key, LastMessageHandler};
-use dungeonbot::commands::{ping, register, leaderboard};
+use dungeonbot::commands::{aura, leaderboard, ping, register};
 
 #[tokio::main]
 async fn main() {
@@ -33,7 +33,7 @@ async fn main() {
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
-            commands: vec![ping(), register(), leaderboard()],
+            commands: vec![ping(), register(), leaderboard(), aura()],
             ..Default::default()
         })
         .setup(move |ctx, _ready, framework| {

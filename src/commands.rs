@@ -1,7 +1,7 @@
 use serenity::all::UserId;
 
 use crate::models::User;
-use crate::{establish_connection, top_users};
+use crate::{establish_connection, get_user, top_users};
 use crate::Error;
 
 pub struct Data;
@@ -16,7 +16,7 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
 /// Displays the leaderboard of the users with the
 /// highest aura in the server
 #[poise::command(
-    slash_command, 
+    slash_command,
     prefix_command)
 ]
 pub async fn leaderboard(
@@ -38,7 +38,7 @@ pub async fn leaderboard(
     let mut i = offset + 1;
     for user in top_users(connection, 10, offset) {
         let User {
-            id: user_id, 
+            id: user_id,
             points: pts
         } = user;
         let user_id = user_id as u64;
@@ -55,6 +55,27 @@ pub async fn leaderboard(
 
     ctx.say(format!("```\n{}\n```", output)).await?;
 
+    Ok(())
+}
+
+/// Displays your aura
+#[poise::command(
+    slash_command,
+    prefix_command)
+]
+pub async fn aura(ctx: Context<'_>) -> Result<(), Error> {
+    let author = ctx.author();
+    let connection = &mut establish_connection();
+    let User {
+        id,
+        points
+    } = get_user(connection, author.id.into())
+        .expect("/aura: Unable to get db user");
+    let user = UserId::new(id as u64)
+        .to_user(&ctx.http())
+        .await
+        .expect("Unable to find user");
+    ctx.say(format!("{}, you have {} aura.", user.name, points)).await?;
     Ok(())
 }
 

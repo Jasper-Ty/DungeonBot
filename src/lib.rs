@@ -40,6 +40,18 @@ pub fn new_user(conn: &mut SqliteConnection, user_id: u64) -> Option<User> {
         .flatten()
 }
 
+/// Gets the user `user_id`
+pub fn get_user(conn: &mut SqliteConnection, user_id: u64) -> Option<User> {
+    use schema::users::dsl::*;
+
+    users
+        .find(user_id as i64)
+        .select(User::as_select())
+        .first(conn)
+        .optional()
+        .expect("Error retrieving user")
+}
+
 /// Adds `points` points to user `user_id`.
 pub fn add_points(conn: &mut SqliteConnection, user_id: u64, pts: i32) {
     use schema::users::dsl::*;
