@@ -1,5 +1,4 @@
-pub mod models;
-pub mod schema;
+pub mod db;
 
 pub mod commands;
 pub mod lastmessage;
@@ -8,6 +7,8 @@ use diesel::sqlite::SqliteConnection;
 use diesel::prelude::*;
 use dotenvy::dotenv;
 use std::env;
+
+use db::{models, schema};
 
 type Error = Box<dyn std::error::Error + Send + Sync>;
 type Result<T> = core::result::Result<T, Error>;
