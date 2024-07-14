@@ -1,7 +1,7 @@
-use std::env;
-
 use dotenvy::dotenv;
 
+use dungeonbot::db::run_migrations;
+use dungeonbot::{env_snowflake, env_str, establish_connection};
 use serenity::prelude::*;
 use serenity::all::GuildId;
 
@@ -14,21 +14,19 @@ async fn main() -> Result<()> {
 
     dotenv().ok();
 
-    let guild_id = { 
-        let s = env::var("GUILD_ID")
-            .expect("GUILD_ID must be set");
-        let u = s.parse::<u64>()
-            .expect("GUILD_ID is not an integer");
-        GuildId::new(u)
-    };
+    // run pending migrations
+    {
+        let conn = &mut establish_connection();
+        run_migrations(conn)?;
+    }
 
-    let bot_token = env::var("BOT_TOKEN")
-        .expect("BOT_TOKEN must be set");
+
+    let guild_id: GuildId = env_snowflake("GUILD_ID")?;
+    let bot_token = env_str("BOT_TOKEN")?;
 
     let intents = GatewayIntents::GUILD_MESSAGES 
         | GatewayIntents::DIRECT_MESSAGES 
         | GatewayIntents::MESSAGE_CONTENT;
-
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {

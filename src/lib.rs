@@ -97,6 +97,17 @@ pub fn env_snowflake<T: From<u64>> (key: &str) -> Result<T> {
     ))
 }
 
+
+pub fn env_str(key: &str) -> Result<String> {
+    env::var(key)
+        .map_err(|e| 
+                 DungeonBotError::EnvVarError { 
+                     key: key.to_string(), 
+                     source: e 
+                 })
+}
+
+
 /// hh:mm:ss convenience function
 pub fn hms(seconds: i64) -> String {
     let s = seconds % 60;

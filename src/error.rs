@@ -1,4 +1,4 @@
-use std::{env::VarError, num::ParseIntError};
+use std::{env::VarError, error::Error, num::ParseIntError};
 
 use thiserror::Error;
 
@@ -28,6 +28,9 @@ pub enum DungeonBotError {
 
     #[error("User {0} not found (discord)")]
     DiscordUserNotFoundError(u64),
+
+    #[error("Unknown")]
+    MigrationError(Box<dyn Error + Send + Sync + 'static>),
 
     #[error("Unknown")]
     Unknown,
