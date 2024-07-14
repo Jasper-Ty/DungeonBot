@@ -2,10 +2,14 @@ use std::{env::VarError, error::Error, num::ParseIntError};
 
 use thiserror::Error;
 
+/// Big error class :flabbergasted:
 #[derive(Error, Debug)]
 pub enum DungeonBotError {
     #[error("Database (diesel) error")]
     DbError (#[from] diesel::result::Error),
+
+    #[error("Error connecting to database")]
+    DbConnError (#[from] diesel::ConnectionError),
 
     #[error("Discord (serenity) error")]
     DiscordError (#[from] serenity::Error),
@@ -31,6 +35,9 @@ pub enum DungeonBotError {
 
     #[error("Unknown")]
     MigrationError(Box<dyn Error + Send + Sync + 'static>),
+
+    #[error("Other: {0}")]
+    Other(String),
 
     #[error("Unknown")]
     Unknown,

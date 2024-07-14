@@ -1,7 +1,7 @@
 use dotenvy::dotenv;
 
-use dungeonbot::db::run_migrations;
-use dungeonbot::{env_snowflake, env_str, db_conn};
+use dungeonbot::db::{db_conn, run_migrations};
+use dungeonbot::{env_snowflake, env_str};
 use serenity::prelude::*;
 use serenity::all::GuildId;
 
@@ -15,7 +15,10 @@ async fn main() -> Result<()> {
     dotenv().ok();
 
     // run pending migrations
-    run_migrations(&mut db_conn())?;
+    {
+        let conn = &mut db_conn()?;
+        run_migrations(conn)?;
+    }
 
     let guild_id: GuildId = env_snowflake("GUILD_ID")?;
     let bot_token = env_str("BOT_TOKEN")?;

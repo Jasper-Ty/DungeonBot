@@ -6,22 +6,10 @@ pub mod error;
 
 use std::env;
 
-use dotenvy::dotenv;
-
-use diesel::sqlite::SqliteConnection;
 use diesel::prelude::*;
 
 use db::{models, schema};
 use error::{DungeonBotError, Result};
-
-pub fn db_conn() -> SqliteConnection {
-    dotenv().ok();
-
-    let database_url = env::var("DATABASE_URL")
-        .expect("DATABASE_URL must be set");
-    SqliteConnection::establish(&database_url)
-        .unwrap_or_else(|_| panic! ("Error connecting to {}", database_url))
-}
 
 use models::User;
 
