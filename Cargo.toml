@@ -1,14 +1,17 @@
 [package]
 name = "dungeonbot"
+authors = ["Jasper Ty <jasperty2@gmail.com>"]
 version = "0.1.0"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-diesel = { version = "2.2.0", features = ["sqlite", "returning_clauses_for_sqlite_3_35"] }
+thiserror = "1.0"
 dotenvy = "0.15"
+
+diesel = { version = "2.2.0", features = ["sqlite", "returning_clauses_for_sqlite_3_35"] }
+
+tokio = { version = "1.21.2", features = ["macros", "rt-multi-thread"] }
 poise = "0.6.1"
 serenity = "0.12.2"
-tokio = { version = "1.21.2", features = ["macros", "rt-multi-thread"] }
-toml = "0.8.14"

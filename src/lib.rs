@@ -2,16 +2,17 @@ pub mod db;
 
 pub mod commands;
 pub mod lastmessage;
+pub mod error;
+
+use std::env;
+
+use dotenvy::dotenv;
 
 use diesel::sqlite::SqliteConnection;
 use diesel::prelude::*;
-use dotenvy::dotenv;
-use std::env;
 
 use db::{models, schema};
-
-type Error = Box<dyn std::error::Error + Send + Sync>;
-type Result<T> = core::result::Result<T, Error>;
+use error::{DungeonBotError, Result};
 
 pub fn establish_connection() -> SqliteConnection {
     dotenv().ok();
@@ -41,8 +42,8 @@ pub fn new_user(conn: &mut SqliteConnection, user_id: u64) -> Option<User> {
         .flatten()
 }
 
-/// Gets the user `user_id`
-pub fn get_user(conn: &mut SqliteConnection, user_id: u64) -> Option<User> {
+/// Gets the user `user_id`. Returns None if the user is not found.
+pub fn get_user(conn: &mut SqliteConnection, user_id: u64) -> Result<Option<User>> {
     use schema::users::dsl::*;
 
     users
@@ -50,11 +51,11 @@ pub fn get_user(conn: &mut SqliteConnection, user_id: u64) -> Option<User> {
         .select(User::as_select())
         .first(conn)
         .optional()
-        .expect("Error retrieving user")
+        .map_err(DungeonBotError::from)
 }
 
-/// Adds `points` points to user `user_id`.
-pub fn add_points(conn: &mut SqliteConnection, user_id: u64, pts: i32) {
+/// Adds `points` points to user `user_id`. Returns the updated number of points.
+pub fn add_points(conn: &mut SqliteConnection, user_id: u64, pts: i32) -> Result<usize> {
     use schema::users::dsl::*;
     let user_id = user_id as i64;
 
@@ -62,7 +63,7 @@ pub fn add_points(conn: &mut SqliteConnection, user_id: u64, pts: i32) {
         .filter(id.eq(user_id))
         .set(points.eq(points + pts))
         .execute(conn)
-        .expect("Error adding points");
+        .map_err(DungeonBotError::from)
 }
 
 pub fn top_users(conn: &mut SqliteConnection, lim: i64, off: i64) -> Vec<User> {
@@ -81,8 +82,18 @@ pub fn top_users(conn: &mut SqliteConnection, lim: i64, off: i64) -> Vec<User> {
 /// id data type is a snowflake (e.g a user id).
 pub fn env_snowflake<T: From<u64>> (key: &str) -> Result<T> {
     Ok(T::from(
-        env::var(key)?
-        .parse::<u64>()?
+        env::var(key)
+            .map_err(|e| 
+                     DungeonBotError::EnvVarError { 
+                         key: key.to_string(), 
+                         source: e 
+                     })?
+        .parse::<u64>()
+            .map_err(|e| 
+                     DungeonBotError::SnowflakeParseError { 
+                         snowflake: key.to_string(), 
+                         source: e 
+                     })?
     ))
 }
 

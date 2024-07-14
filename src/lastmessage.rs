@@ -108,7 +108,8 @@ impl EventHandler for LastMessageHandler {
             }
 
             // Update database value
-            add_points(connection, curr.user.id.into(), (dt/5) as i32);
+            add_points(connection, curr.user.id.into(), (dt/5) as i32)
+                .expect("Unable to add points");
 
             // Update value in mutex
             *lmdata = None;

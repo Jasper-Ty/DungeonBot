@@ -1,16 +1,16 @@
 use std::env;
-use ::serenity::all::GuildId;
 
 use dotenvy::dotenv;
 
-use poise::serenity_prelude as serenity;
 use serenity::prelude::*;
+use serenity::all::GuildId;
 
 use dungeonbot::lastmessage::{install_lastmessage_key, LastMessageHandler};
 use dungeonbot::commands::{aura, leaderboard, ping, register};
+use dungeonbot::error::{DungeonBotError, Result};
 
 #[tokio::main]
-async fn main() {
+async fn main() -> Result<()> {
 
     dotenv().ok();
 
@@ -29,7 +29,6 @@ async fn main() {
         | GatewayIntents::DIRECT_MESSAGES 
         | GatewayIntents::MESSAGE_CONTENT;
 
-    let handler = LastMessageHandler;
 
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
@@ -43,18 +42,18 @@ async fn main() {
             })
         })
         .build();
-
+    
+    // Build client
     let mut client = Client::builder(&bot_token, intents)
         .framework(framework)
-        .event_handler(handler)
-        .await
-        .expect("Error creating client");
+        .event_handler(LastMessageHandler)
+        .await?; 
 
     // Add LastMessageWinner to the global data dictionary
     install_lastmessage_key(&mut client).await;
 
     // Let's go!
-    if let Err(why) = client.start().await {
-        println!("Client error: {why:?}");
-    }
+    client.start()
+        .await
+        .map_err(DungeonBotError::from)
 }

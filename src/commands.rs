@@ -2,13 +2,13 @@ use serenity::all::UserId;
 
 use crate::models::User;
 use crate::{establish_connection, get_user, top_users};
-use crate::Error;
+use crate::error::{DungeonBotError, Result};
 
 pub struct Data;
-type Context<'a> = poise::Context<'a, Data, Error>;
+type Context<'a> = poise::Context<'a, Data, DungeonBotError>;
 
 #[poise::command(slash_command, prefix_command)]
-pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn ping(ctx: Context<'_>) -> Result<()> {
     ctx.say("Pong!").await?;
     Ok(())
 }
@@ -22,7 +22,7 @@ pub async fn ping(ctx: Context<'_>) -> Result<(), Error> {
 pub async fn leaderboard(
     ctx: Context<'_>,
     #[description = "Page number"] page: Option<u64>
-) -> Result<(), Error> {
+) -> Result<()> {
     let mut output: String = String::new();
 
     let pagenum = page.unwrap_or(1) as i64;
@@ -63,24 +63,31 @@ pub async fn leaderboard(
     slash_command,
     prefix_command)
 ]
-pub async fn aura(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn aura(ctx: Context<'_>) -> Result<()> {
     let author = ctx.author();
+    let user_id: u64 = author.id.into();
     let connection = &mut establish_connection();
+
+    // Retrieve points from db
     let User {
         id,
         points
-    } = get_user(connection, author.id.into())
-        .expect("/aura: Unable to get db user");
+    } = get_user(connection, user_id)?
+        .ok_or(DungeonBotError::DbUserNotFoundError(user_id))?;
+
+    // Need to do this to get username
     let user = UserId::new(id as u64)
         .to_user(&ctx.http())
         .await
-        .expect("Unable to find user");
+        .map_err(DungeonBotError::from)?;
+
     ctx.say(format!("{}, you have {} aura.", user.name, points)).await?;
+
     Ok(())
 }
 
 #[poise::command(prefix_command)]
-pub async fn register(ctx: Context<'_>) -> Result<(), Error> {
+pub async fn register(ctx: Context<'_>) -> Result<()> {
     poise::builtins::register_application_commands_buttons(ctx).await?;
     Ok(())
 }
