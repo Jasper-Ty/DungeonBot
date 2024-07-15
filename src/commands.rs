@@ -2,8 +2,8 @@ use std::fmt::Write;
 use std::error::Error;
 
 use poise::CreateReply;
-use serenity::all::{EmbedField, Member, Timestamp, UserId};
-use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage};
+use serenity::all::{Member, Timestamp, UserId};
+use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 
 use crate::lastmessage::LastMessage;
 use crate::models::User;
