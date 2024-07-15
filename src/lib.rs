@@ -3,6 +3,7 @@ use db::{models, schema};
 
 pub mod commands;
 pub mod lastmessage;
+pub mod counting;
 pub mod error;
 pub mod messagehandler;
 
