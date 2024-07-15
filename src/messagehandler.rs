@@ -2,7 +2,7 @@ use serenity::all::Message;
 use serenity::prelude::*;
 use serenity::async_trait;
 
-use crate::lastmessage::lm_handler;
+use crate::lastmessage::LastMessage;
 
 /// This unit struct denominates all message handlers
 /// via Serenity's EventHandler trait
@@ -13,7 +13,7 @@ impl EventHandler for MessageHandler {
     async fn message(&self, mut ctx: Context, msg: Message) {
         
         // Last Message
-        lm_handler(&mut ctx, &msg).await
+        LastMessage::handler(&mut ctx, &msg).await
             .unwrap();
     }
 }

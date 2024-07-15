@@ -54,104 +54,99 @@ impl LastMessage {
         let mut data = client.data.write().await;
         data.insert::<Self>(Arc::new(RwLock::new(None)));
     }
-}
 
-pub async fn lm_handler(
-    ctx: &mut Context, 
-    msg: &Message
-) -> Result<()> {
+    pub async fn handler(ctx: &mut Context, msg: &Message) -> Result<()> {
+        dotenv().ok();
+        let lmchannel: ChannelId = 
+            env_snowflake("LAST_MESSAGE_CHANNEL_ID")?;
+        let lmrole: RoleId = 
+            env_snowflake("LAST_MESSAGE_ROLE_ID")?;
+        let connection = &mut db_conn()?;
 
-    dotenv().ok();
-    let lmchannel: ChannelId = 
-        env_snowflake("LAST_MESSAGE_CHANNEL_ID")?;
-    let lmrole: RoleId = 
-        env_snowflake("LAST_MESSAGE_ROLE_ID")?;
-    let connection = &mut db_conn()?;
+        // Don't care if it's not in the right channel!
+        if msg.channel_id != lmchannel { return Ok(()) }
+        // No bots!
+        if msg.author.bot { return Ok(()) }
 
-    // Don't care if it's not in the right channel!
-    if msg.channel_id != lmchannel { return Ok(()) }
-    // No bots!
-    if msg.author.bot { return Ok(()) }
+        // Create a new database entry and retrieve guild user
+        new_user(connection, msg.author.id.into());
+        let new = msg.member(&ctx.http).await?;
 
-    // Create a new database entry and retrieve guild user
-    new_user(connection, msg.author.id.into());
-    let new = msg.member(&ctx.http).await?;
+        // Get the LMLock
+        let mut lmlock = LastMessage::acquire_lock(ctx).await?;
 
-    // Get the LMLock
-    let mut lmlock = LastMessage::acquire_lock(ctx).await?;
-
-    // If winner isn't changing, no-op.
-    if !is_new_winner(&lmlock, &new).await {
-        return Ok(())
-    }
-
-    /* Two steps (2 http requests) to update last message winner:
-     *
-     * a. Removing role from the previous winner
-     * b. Adding role to the new winner
-     *
-     * NOT A BIG DEAL if (a) succeeds and (2) fails:
-     *      LM role now has 0 members-- meh
-     * BIG DEAL if (a) fails and (2) succeeds:
-     *      LM role now has >1 members-- NOT GOOD
-     *
-     * So we try to do (a), and if that succeeds, do (b).
-     *
-     * This guarantees the role will only ever have at most one member in it.
-     */
-
-    // (a)
-    let lmdata = pop_curr_winner(
-        ctx, 
-        &mut lmlock, 
-        &lmrole
-    ).await?;
-
-    // (b)
-    set_new_winner(
-        ctx, 
-        &mut lmlock, 
-        &lmrole, 
-        &new, 
-        &msg.timestamp
-    ).await?;
-
-    /*
-     * Then, once the Discord side is finished, the database side is much easier and much more
-     * reliable, and we always try to do 
-     *
-     * c. Hand out points to streak winner
-     */
-
-    // (c)
-    if let Some(LastMessageData {
-        memb: curr,
-        timestamp,
-    }) = lmdata {
-
-        let dt = {
-            let t0 = timestamp.timestamp();
-            let t1 = msg.timestamp.timestamp();
-            t1 - t0
-        };
-
-        // Update database value
-        add_points(connection, curr.user.id.into(), (dt/STREAK_MULTIPLIER) as i32)
-            .expect("Unable to add points");
-
-        // Update database value
-        add_points(connection, new.user.id.into(), (dt/STREAK_BONUS_MULTIPLIER) as i32)
-            .expect("Unable to add points");
-
-        if dt >= 300 {
-            streak_message(ctx, &curr, &new, dt, lmchannel).await
-                .expect("Error sending streak message");
+        // If winner isn't changing, no-op.
+        if !is_new_winner(&lmlock, &new).await {
+            return Ok(())
         }
+
+        /* Two steps (2 http requests) to update last message winner:
+         *
+         * a. Removing role from the previous winner
+         * b. Adding role to the new winner
+         *
+         * NOT A BIG DEAL if (a) succeeds and (2) fails:
+         *      LM role now has 0 members-- meh
+         * BIG DEAL if (a) fails and (2) succeeds:
+         *      LM role now has >1 members-- NOT GOOD
+         *
+         * So we try to do (a), and if that succeeds, do (b).
+         *
+         * This guarantees the role will only ever have at most one member in it.
+         */
+
+        // (a)
+        let lmdata = pop_curr_winner(
+            ctx, 
+            &mut lmlock, 
+            &lmrole
+        ).await?;
+
+        // (b)
+        set_new_winner(
+            ctx, 
+            &mut lmlock, 
+            &lmrole, 
+            &new, 
+            &msg.timestamp
+        ).await?;
+
+        /*
+         * Then, once the Discord side is finished, the database side is much easier and much more
+         * reliable, and we always try to do 
+         *
+         * c. Hand out points to streak winner
+         */
+
+        // (c)
+        if let Some(LastMessageData {
+            memb: curr,
+            timestamp,
+        }) = lmdata {
+
+            let dt = {
+                let t0 = timestamp.timestamp();
+                let t1 = msg.timestamp.timestamp();
+                t1 - t0
+            };
+
+            // Update database value
+            add_points(connection, curr.user.id.into(), (dt/STREAK_MULTIPLIER) as i32)
+                .expect("Unable to add points");
+
+            // Update database value
+            add_points(connection, new.user.id.into(), (dt/STREAK_BONUS_MULTIPLIER) as i32)
+                .expect("Unable to add points");
+
+            if dt >= 300 {
+                streak_message(ctx, &curr, &new, dt, lmchannel).await
+                    .expect("Error sending streak message");
+            }
+        }
+
+        Ok(())
     }
-
-    Ok(())
 }
-
 
 async fn is_new_winner(rwlock: &LMLock, new: &Member) -> bool {
     let read_lock = rwlock.read().await;
