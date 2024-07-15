@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use serenity::all::UserId;
 use tokio::sync::RwLock; // Need async Mutex, will be holding across awaits
                         
 use serenity::prelude::*;
@@ -14,10 +15,18 @@ use crate::error::Result;
 
 pub struct LastMessageHandler;
 
-#[derive(Clone)]
-struct LastMessageData {
+#[derive(Debug, Clone)]
+pub struct LastMessageData {
     memb: Member,
     timestamp: Timestamp,
+}
+impl LastMessageData {
+    pub fn id(&self) -> UserId {
+        self.memb.user.id
+    }
+    pub fn timestamp(&self) -> Timestamp {
+        self.timestamp
+    }
 }
 
 const STREAK_MULTIPLIER: i64 = 5;
@@ -25,13 +34,13 @@ const STREAK_BONUS_MULTIPLIER: i64 = 40;
 
 /// The underlying async data structure that holds the
 /// last-message winner.
-type LMLock = Arc<RwLock<Option<LastMessageData>>>;
+pub type LMLock = Arc<RwLock<Option<LastMessageData>>>;
 
 // Holds the user id of the current Last Message Winner
 // Serenity uses unit structs to set up the type system for
 // their global data dictionary (data member in Context)
 // (Very TypeScript-y business!)
-struct LastMessage;
+pub struct LastMessage;
 impl TypeMapKey for LastMessage {
     type Value = LMLock;
 }

@@ -1,8 +1,11 @@
 use std::fmt::Write;
 use std::error::Error;
 
-use serenity::all::{Member, UserId};
+use poise::CreateReply;
+use serenity::all::{EmbedField, Member, Timestamp, UserId};
+use serenity::builder::{CreateEmbed, CreateEmbedFooter, CreateMessage};
 
+use crate::lastmessage::LastMessage;
 use crate::models::User;
 use crate::db::{get_user, new_user, top_users, xfer_points};
 use crate::error::{DungeonBotError, Result};
@@ -21,25 +24,34 @@ pub async fn ping(ctx: Context<'_>) -> Result<()> {
 /// Displays the leaderboard of the users with the
 /// highest aura in the server
 #[poise::command(
-    slash_command,
-    prefix_command
+    slash_command
 )]
 pub async fn leaderboard(
     ctx: Context<'_>,
-    #[description = "Page number"] page: Option<u64>
+    #[description = "Page number"] 
+    #[min=1]
+    #[max=10000]
+    page: Option<i64>
 ) -> Result<()> {
     let mut output: String = String::new();
 
-    let pagenum = page.unwrap_or(1) as i64;
-    let pagestr = format!("page {}", pagenum);
+    let page = page.unwrap_or(1);
 
-    output.push_str(&format!("Leaderboard {:>33}\n", pagestr));
-    output.push_str("=============================================\n");
-    output.push_str("Rank Username                            Aura\n");
+    let lmdata = {
+        let lmlock = ctx.serenity_context().data.read().await.get::<LastMessage>()
+            .ok_or(DungeonBotError::TypeMapMissingKeyError("LastMessage".to_string()))?
+            .clone();
+
+        let read_lock = lmlock.read().await;
+
+        read_lock.clone()         
+    };
 
     let connection = &mut db_conn()?;
 
-    let offset = (pagenum-1) * 10;
+    let mut fields = vec![];
+
+    let offset = (page-1) * 10;
     let mut i = offset + 1;
     for user in top_users(connection, 10, offset) {
         let User {
@@ -53,40 +65,91 @@ pub async fn leaderboard(
             .await
             .expect("Unable to find user");
 
-        let entry = format!("{:>4} {:<30}{:>10}\n", i, user.name, pts);
-        output.push_str(&entry);
+        let field_title = match lmdata {
+            Some(ref lmdata) if lmdata.id() == user.id => {
+                format!("{}. {} ⭐", i, user.name)
+            },
+            _ => format!("{}. {}", i, user.name.to_string())
+        };
+
+        let field_body = match lmdata {
+            Some(ref lmdata) if lmdata.id() == user.id => {
+                let dt = ctx.created_at().timestamp() - lmdata.timestamp().timestamp();
+                format!("{} aura ({} total + {} current streak)", pts as i64 + dt/5, pts, dt/5)
+            },
+            _ => format!("{} aura", pts),
+        };
+
+        fields.push((field_title, field_body, false));
         i += 1;
     }
 
-    ctx.say(format!("```\n{}\n```", output)).await?;
+    let footer = CreateEmbedFooter::new(format!("Page {}", page));
+    let embed = CreateEmbed::new()
+        .title("The Friendship Dungeon Aura Leaderboard")
+        .fields(fields)
+        .footer(footer)
+        .timestamp(Timestamp::now());
+
+    let builder = CreateReply::default()
+        .embed(embed);
+
+    ctx.send(builder).await?;
 
     Ok(())
 }
 
-/// Displays your aura
+
 #[poise::command(
     slash_command,
-    prefix_command,
-    subcommands("aura_give")
+    subcommands("aura_show", "aura_give")
 )]
-pub async fn aura(ctx: Context<'_>) -> Result<()> {
+pub async fn aura(_: Context<'_>) -> Result<()> { Ok(()) }
+
+/// Displays your aura.
+#[poise::command(
+    slash_command,
+    rename="show",
+    on_error="error_handler",
+)]
+async fn aura_show(ctx: Context<'_>) -> Result<()> {
     let user_id: u64 = ctx.author().id.into();
     let connection = &mut db_conn()?;
 
+    let streak = {
+        let lmlock = ctx.serenity_context().data.read().await.get::<LastMessage>()
+            .ok_or(DungeonBotError::TypeMapMissingKeyError("LastMessage".to_string()))?
+            .clone();
+
+        let read_lock = lmlock.read().await;
+
+        match read_lock.as_ref() {
+            Some(lmdata) if lmdata.id() == user_id => {
+                let t0 = lmdata.timestamp().timestamp();
+                let t1 = ctx.created_at().timestamp();
+                Some(t1-t0)
+            },
+            _ => None
+        }
+    };
+
     // Retrieve points from db
     let User {
-        id,
+        id:_,
         points
     } = get_user(connection, user_id)?
         .ok_or(DungeonBotError::DbUserNotFoundError(user_id))?;
 
-    // Need to do this to get username
-    let user = UserId::new(id as u64)
-        .to_user(&ctx.http())
-        .await
-        .map_err(DungeonBotError::from)?;
-
-    ctx.say(format!("{}, you have {} aura.", user.name, points)).await?;
+    let name = ctx.author_member().await
+        .ok_or(DungeonBotError::DbUserNotFoundError(user_id))?
+        .display_name()
+        .to_string();
+        
+    let reply = match streak {
+        Some(t) => format!("{}, you have {} aura. ({} total + {} current streak)", name, points as i64 + t/5, points, t/5),
+        None => format!("{}, you have {} aura.", name, points),
+    };
+    ctx.say(reply).await?;
 
     Ok(())
 }
@@ -97,7 +160,7 @@ pub async fn aura(ctx: Context<'_>) -> Result<()> {
     rename="give",
     on_error="error_handler",
 )]
-pub async fn aura_give(
+async fn aura_give(
     ctx: Context<'_>,
     #[description="Recipient"] to: Member,
     #[description="Amount of aura to give"] pts: u32,
@@ -105,6 +168,8 @@ pub async fn aura_give(
     let to_id: u64 = to.user.id.into();
     let from_id: u64 = ctx.author().id.into();
 
+    ctx.say("Sorry, can't let this command be used yet").await?;
+    return Ok(());
 
     let connection = &mut db_conn()?;
     new_user(connection, to_id);
@@ -123,12 +188,6 @@ pub async fn aura_give(
     Ok(())
 }
 
-#[poise::command(prefix_command)]
-pub async fn register(ctx: Context<'_>) -> Result<()> {
-    poise::builtins::register_application_commands_buttons(ctx).await?;
-    Ok(())
-}
-
 async fn error_handler(error: poise::FrameworkError<'_, Data, DungeonBotError>) {
     if let Some(ctx) = error.ctx() {
         let mut err_reply_msg = format!("Oh noes, an error <:flabbergasted:1250998996596555817>. Please let Jasper know about this immediately.\n");
@@ -140,4 +199,25 @@ async fn error_handler(error: poise::FrameworkError<'_, Data, DungeonBotError>) 
         ctx.say(err_reply_msg).await
             .expect("Unable to send error message");
     }
+}
+
+use serenity::all::GuildId;
+
+/// Wrapper for the framework building
+pub fn dungeonbot_framework(guild_id: GuildId) -> poise::Framework<Data, DungeonBotError>{
+
+    let options = poise::FrameworkOptions {
+        commands: vec![ping(), leaderboard(), aura()],
+        ..Default::default()
+    };
+
+    poise::Framework::builder()
+        .options(options)
+        .setup(move |ctx, _ready, framework| {
+            Box::pin(async move {
+                poise::builtins::register_in_guild(ctx, &framework.options().commands, guild_id).await?;
+                Ok(Data)
+            })
+        })
+        .build()
 }

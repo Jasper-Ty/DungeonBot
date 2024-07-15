@@ -6,7 +6,7 @@ use serenity::prelude::*;
 use serenity::all::GuildId;
 
 use dungeonbot::lastmessage::{install_lastmessage_key, LastMessageHandler};
-use dungeonbot::commands::{aura, leaderboard, ping, register};
+use dungeonbot::commands::dungeonbot_framework;
 use dungeonbot::error::{DungeonBotError, Result};
 
 #[tokio::main]
@@ -28,19 +28,8 @@ async fn main() -> Result<()> {
         | GatewayIntents::MESSAGE_CONTENT;
 
     // Build framework
-    let framework = poise::Framework::builder()
-        .options(poise::FrameworkOptions {
-            commands: vec![ping(), register(), leaderboard(), aura()],
-            ..Default::default()
-        })
-        .setup(move |ctx, _ready, framework| {
-            Box::pin(async move {
-                poise::builtins::register_in_guild(ctx, &framework.options().commands, guild_id).await?;
-                Ok (dungeonbot::commands::Data)
-            })
-        })
-        .build();
-    
+    let framework = dungeonbot_framework(guild_id);
+
     // Build client
     let mut client = Client::builder(&bot_token, intents)
         .framework(framework)

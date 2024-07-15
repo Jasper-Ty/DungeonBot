@@ -30,6 +30,9 @@ pub enum DungeonBotError {
     #[error("User {0} not found (database)")]
     DbUserNotFoundError(u64),
 
+    #[error("Global data does not have key {0}")]
+    TypeMapMissingKeyError(String),
+
     #[error("User {0} not found (discord)")]
     DiscordUserNotFoundError(u64),
 
