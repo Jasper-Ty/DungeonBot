@@ -1,9 +1,8 @@
 use std::sync::Arc;
-use serenity::all::UserId;
 use tokio::sync::RwLock; // Need async Mutex, will be holding across awaits
                         
 use serenity::prelude::*;
-use serenity::all::{Message, RoleId, ChannelId, Member, Timestamp};
+use serenity::all::{Message, UserId, RoleId, ChannelId, Member, Timestamp};
 
 use dotenvy::dotenv;
 
