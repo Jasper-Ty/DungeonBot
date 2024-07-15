@@ -6,7 +6,7 @@ use dungeonbot::{env_snowflake, env_str};
 use serenity::prelude::*;
 use serenity::all::GuildId;
 
-use dungeonbot::lastmessage::install_lastmessage_key;
+use dungeonbot::lastmessage::LastMessage;
 use dungeonbot::commands::dungeonbot_framework;
 use dungeonbot::error::{DungeonBotError, Result};
 
@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
         .await?; 
 
     // Add LastMessageWinner to the global data dictionary
-    install_lastmessage_key(&mut client).await;
+    LastMessage::install(&mut client).await;
 
     // Let's go!
     client.start()

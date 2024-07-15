@@ -50,11 +50,10 @@ impl LastMessage {
             .ok_or(DungeonBotError::TypeMapKeyError("LastMessage".to_string()))
             .cloned()
     }
-}
-
-pub async fn install_lastmessage_key(client: &mut Client) {
-    let mut data = client.data.write().await;
-    data.insert::<LastMessage>(Arc::new(RwLock::new(None)));
+    pub async fn install(client: &mut Client) {
+        let mut data = client.data.write().await;
+        data.insert::<Self>(Arc::new(RwLock::new(None)));
+    }
 }
 
 pub async fn lm_handler(
