@@ -12,8 +12,6 @@ use crate::{env_snowflake, hms};
 use crate::db::{db_conn, add_points, new_user};
 use crate::error::Result;
 
-pub struct LastMessageHandler;
-
 #[derive(Debug, Clone)]
 pub struct LastMessageData {
     memb: Member,
