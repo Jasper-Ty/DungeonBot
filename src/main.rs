@@ -1,11 +1,12 @@
 use dotenvy::dotenv;
 
 use dungeonbot::db::{db_conn, run_migrations};
+use dungeonbot::messagehandler::MessageHandler;
 use dungeonbot::{env_snowflake, env_str};
 use serenity::prelude::*;
 use serenity::all::GuildId;
 
-use dungeonbot::lastmessage::{install_lastmessage_key, LastMessageHandler};
+use dungeonbot::lastmessage::install_lastmessage_key;
 use dungeonbot::commands::dungeonbot_framework;
 use dungeonbot::error::{DungeonBotError, Result};
 
@@ -33,7 +34,7 @@ async fn main() -> Result<()> {
     // Build client
     let mut client = Client::builder(&bot_token, intents)
         .framework(framework)
-        .event_handler(LastMessageHandler)
+        .event_handler(MessageHandler)
         .await?; 
 
     // Add LastMessageWinner to the global data dictionary
