@@ -4,7 +4,7 @@ use db::{models, schema};
 pub mod commands;
 pub mod lastmessage;
 pub mod error;
-
+pub mod messagehandler;
 
 use std::env;
 use error::{DungeonBotError, Result};
