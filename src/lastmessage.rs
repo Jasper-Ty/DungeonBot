@@ -78,10 +78,10 @@ pub async fn lm_handler(
     let new = msg.member(&ctx.http).await?;
 
     // Get the LMLock
-    let mut rwlock = get_lmlock(ctx).await;
+    let mut lmlock = get_lmlock(ctx).await;
 
     // If winner isn't changing, no-op.
-    if !is_new_winner(&rwlock, &new).await {
+    if !is_new_winner(&lmlock, &new).await {
         return Ok(())
     }
 
@@ -103,14 +103,14 @@ pub async fn lm_handler(
     // (a)
     let lmdata = pop_curr_winner(
         ctx, 
-        &mut rwlock, 
+        &mut lmlock, 
         &lmrole
     ).await?;
 
     // (b)
     set_new_winner(
         ctx, 
-        &mut rwlock, 
+        &mut lmlock, 
         &lmrole, 
         &new, 
         &msg.timestamp
