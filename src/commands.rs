@@ -1,10 +1,14 @@
-use serenity::all::UserId;
+use std::fmt::Write;
+use std::error::Error;
+
+use serenity::all::{Member, UserId};
 
 use crate::models::User;
-use crate::{get_user, top_users};
+use crate::db::{get_user, new_user, top_users, xfer_points};
 use crate::error::{DungeonBotError, Result};
 use crate::db::db_conn;
 
+#[derive(Debug)]
 pub struct Data;
 type Context<'a> = poise::Context<'a, Data, DungeonBotError>;
 
@@ -62,7 +66,8 @@ pub async fn leaderboard(
 /// Displays your aura
 #[poise::command(
     slash_command,
-    prefix_command)
+    prefix_command,
+    subcommands("aura_give"))
 ]
 pub async fn aura(ctx: Context<'_>) -> Result<()> {
     let user_id: u64 = ctx.author().id.into();
@@ -86,8 +91,53 @@ pub async fn aura(ctx: Context<'_>) -> Result<()> {
     Ok(())
 }
 
+/// Donates aura to someone
+#[poise::command(
+    slash_command,
+    rename="give",
+    on_error="error_handler",
+)]
+pub async fn aura_give(
+    ctx: Context<'_>,
+    #[description="Recipient"] to: Member,
+    #[description="Amount of aura to give"] pts: u32,
+) -> Result<()> {
+    let to_id: u64 = to.user.id.into();
+    let from_id: u64 = ctx.author().id.into();
+
+
+    let connection = &mut db_conn()?;
+    new_user(connection, to_id);
+    new_user(connection, from_id);
+    xfer_points(connection, to_id, from_id, pts as i32)?; 
+
+    let from = ctx.author_member().await
+        .ok_or(DungeonBotError::DiscordUserNotFoundError(from_id))?;
+
+    let reply = format!(
+        "Transferred {} aura from {} to {}.", 
+        pts, 
+        from.display_name(), 
+        to.display_name());
+    ctx.say(reply).await?;
+    Ok(())
+}
+
 #[poise::command(prefix_command)]
 pub async fn register(ctx: Context<'_>) -> Result<()> {
     poise::builtins::register_application_commands_buttons(ctx).await?;
     Ok(())
+}
+
+async fn error_handler(error: poise::FrameworkError<'_, Data, DungeonBotError>) {
+    if let Some(ctx) = error.ctx() {
+        let mut err_reply_msg = format!("Oh noes, an error <:flabbergasted:1250998996596555817>. Please let Jasper know about this immediately.\n");
+        match error.source() {
+            Some(source_err) => write!(
+                err_reply_msg, "```{:?}\n{}```", source_err, source_err).unwrap(),
+            None => write!(err_reply_msg, "No source error?").unwrap(),
+        }
+        ctx.say(err_reply_msg).await
+            .expect("Unable to send error message");
+    }
 }

@@ -14,7 +14,7 @@ async fn main() -> Result<()> {
 
     dotenv().ok();
 
-    // run pending migrations
+    // Run pending migrations
     {
         let conn = &mut db_conn()?;
         run_migrations(conn)?;
@@ -27,6 +27,7 @@ async fn main() -> Result<()> {
         | GatewayIntents::DIRECT_MESSAGES 
         | GatewayIntents::MESSAGE_CONTENT;
 
+    // Build framework
     let framework = poise::Framework::builder()
         .options(poise::FrameworkOptions {
             commands: vec![ping(), register(), leaderboard(), aura()],

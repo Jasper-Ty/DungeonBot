@@ -9,8 +9,7 @@ use dotenvy::dotenv;
 
 use crate::error::DungeonBotError;
 use crate::{env_snowflake, hms};
-use crate::{add_points, new_user};
-use crate::db::db_conn;
+use crate::db::{db_conn, add_points, new_user};
 use crate::error::Result;
 
 pub struct LastMessageHandler;
@@ -20,6 +19,9 @@ struct LastMessageData {
     memb: Member,
     timestamp: Timestamp,
 }
+
+const STREAK_MULTIPLIER: i64 = 5;
+const STREAK_BONUS_MULTIPLIER: i64 = 40;
 
 /// The underlying async data structure that holds the
 /// last-message winner.
@@ -127,11 +129,11 @@ impl EventHandler for LastMessageHandler {
             };
 
             // Update database value
-            add_points(connection, curr.user.id.into(), (dt/5) as i32)
+            add_points(connection, curr.user.id.into(), (dt/STREAK_MULTIPLIER) as i32)
                 .expect("Unable to add points");
 
             // Update database value
-            add_points(connection, new.user.id.into(), (dt/40) as i32)
+            add_points(connection, new.user.id.into(), (dt/STREAK_BONUS_MULTIPLIER) as i32)
                 .expect("Unable to add points");
 
             if dt >= 300 {
@@ -193,7 +195,7 @@ async fn streak_message(
         new.display_name(),
         curr.display_name(),
         hms(dt),
-        dt/100
+        dt/STREAK_BONUS_MULTIPLIER
     );
 
     lmchannel.say(&ctx.http, streak_message).await     

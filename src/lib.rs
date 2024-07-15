@@ -1,70 +1,13 @@
 pub mod db;
+use db::{models, schema};
 
 pub mod commands;
 pub mod lastmessage;
 pub mod error;
 
+
 use std::env;
-
-use diesel::prelude::*;
-
-use db::{models, schema};
 use error::{DungeonBotError, Result};
-
-use models::User;
-
-pub fn new_user(conn: &mut SqliteConnection, user_id: u64) -> Option<User> {
-    use schema::users::dsl::*;
-    let user_id = user_id as i64;
-
-    let new_user = models::NewUser { id: user_id };
-
-    diesel::insert_into(users)
-        .values(&new_user)
-        .on_conflict(id)
-        .do_nothing()
-        .returning(models::User::as_returning())
-        .get_result(conn)
-        .optional()
-        .ok()
-        .flatten()
-}
-
-/// Gets the user `user_id`. Returns None if the user is not found.
-pub fn get_user(conn: &mut SqliteConnection, user_id: u64) -> Result<Option<User>> {
-    use schema::users::dsl::*;
-
-    users
-        .find(user_id as i64)
-        .select(User::as_select())
-        .first(conn)
-        .optional()
-        .map_err(DungeonBotError::from)
-}
-
-/// Adds `points` points to user `user_id`. Returns the updated number of points.
-pub fn add_points(conn: &mut SqliteConnection, user_id: u64, pts: i32) -> Result<usize> {
-    use schema::users::dsl::*;
-    let user_id = user_id as i64;
-
-    diesel::update(users)
-        .filter(id.eq(user_id))
-        .set(points.eq(points + pts))
-        .execute(conn)
-        .map_err(DungeonBotError::from)
-}
-
-pub fn top_users(conn: &mut SqliteConnection, lim: i64, off: i64) -> Vec<User> {
-    use schema::users::dsl::*;
-
-    users 
-        .limit(lim)
-        .offset(off)
-        .order_by(points.desc())
-        .select((id, points))
-        .load(conn)
-        .expect("Error loading users")
-}
 
 /// Convenience function for getting a type whose underlying
 /// id data type is a snowflake (e.g a user id).
