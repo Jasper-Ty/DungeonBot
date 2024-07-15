@@ -43,12 +43,13 @@ pub struct LastMessage;
 impl TypeMapKey for LastMessage {
     type Value = LMLock;
 }
-
-/// Get the LastMessage RwLock from Context
-async fn get_lmlock(ctx: &mut Context) -> LMLock {
-    ctx.data.read().await.get::<LastMessage>()
-        .expect("Expected LastMessageWinner in TypeMap.")
-        .clone()
+impl LastMessage {
+    /// Get the LastMessage RwLock from Context
+    pub async fn acquire_lock(ctx: &mut Context) -> Result<<Self as TypeMapKey>::Value> {
+        ctx.data.read().await.get::<Self>()
+            .ok_or(DungeonBotError::TypeMapKeyError("LastMessage".to_string()))
+            .cloned()
+    }
 }
 
 pub async fn install_lastmessage_key(client: &mut Client) {
@@ -78,7 +79,7 @@ pub async fn lm_handler(
     let new = msg.member(&ctx.http).await?;
 
     // Get the LMLock
-    let mut lmlock = get_lmlock(ctx).await;
+    let mut lmlock = LastMessage::acquire_lock(ctx).await?;
 
     // If winner isn't changing, no-op.
     if !is_new_winner(&lmlock, &new).await {

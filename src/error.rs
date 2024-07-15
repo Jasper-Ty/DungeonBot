@@ -14,6 +14,9 @@ pub enum DungeonBotError {
     #[error("Discord (serenity) error")]
     DiscordError (#[from] serenity::Error),
 
+    #[error("{0} not found in TypeMap")]
+    TypeMapKeyError (String),
+
     #[error("Error retrieving environment variable `{key}`")]
     EnvVarError {
         key: String,
