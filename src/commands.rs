@@ -22,8 +22,8 @@ pub async fn ping(ctx: Context<'_>) -> Result<()> {
 /// highest aura in the server
 #[poise::command(
     slash_command,
-    prefix_command)
-]
+    prefix_command
+)]
 pub async fn leaderboard(
     ctx: Context<'_>,
     #[description = "Page number"] page: Option<u64>
@@ -67,8 +67,8 @@ pub async fn leaderboard(
 #[poise::command(
     slash_command,
     prefix_command,
-    subcommands("aura_give"))
-]
+    subcommands("aura_give")
+)]
 pub async fn aura(ctx: Context<'_>) -> Result<()> {
     let user_id: u64 = ctx.author().id.into();
     let connection = &mut db_conn()?;
