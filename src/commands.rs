@@ -20,7 +20,8 @@ type Context<'a> = poise::Context<'a, Data, DungeonBotError>;
 /// Displays the leaderboard of the users with the
 /// highest aura in the server
 #[poise::command(
-    slash_command
+    slash_command,
+    guild_only,
 )]
 pub async fn leaderboard(
     ctx: Context<'_>,
@@ -96,6 +97,7 @@ pub async fn leaderboard(
 
 #[poise::command(
     slash_command,
+    guild_only,
     subcommands("aura_show", "aura_give")
 )]
 pub async fn aura(_: Context<'_>) -> Result<()> { Ok(()) }
@@ -152,6 +154,7 @@ async fn aura_show(ctx: Context<'_>) -> Result<()> {
 #[poise::command(
     slash_command,
     owners_only,
+    guild_only,
     rename="give",
     on_error="error_handler",
 )]
@@ -183,6 +186,7 @@ async fn aura_give(
 
 #[poise::command(
     slash_command,
+    guild_only,
     subcommands("count_show", "count_set")
 )]
 pub async fn count(_: Context<'_>) -> Result<()> { Ok(()) }
@@ -190,6 +194,7 @@ pub async fn count(_: Context<'_>) -> Result<()> { Ok(()) }
 /// Displays the current count
 #[poise::command(
     slash_command,
+    guild_only,
     rename="show",
     on_error="error_handler",
 )]
@@ -213,6 +218,7 @@ async fn count_show(ctx: Context<'_>) -> Result<()> {
 #[poise::command(
     slash_command,
     owners_only,
+    guild_only,
     rename="set",
     on_error="error_handler",
 )]
