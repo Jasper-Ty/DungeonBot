@@ -3,7 +3,7 @@ use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
 use dotenvy::dotenv;
  
 use serenity::prelude::*;
-use serenity::all::{ChannelId, Message};
+use serenity::all::{ChannelId, Message, RoleId};
 
 use crate::db::{add_points, db_conn};
 use crate::env_snowflake;
@@ -75,6 +75,7 @@ impl Counting {
         dotenv().ok();
 
         let ctchannel: ChannelId = env_snowflake("COUNTING_CHANNEL_ID")?;
+        let ctrole: RoleId = env_snowflake("COUNTING_ROLE_ID")?;
 
         // Don't care if it's not in the right channel!
         if msg.channel_id != ctchannel { return Ok(()) }
@@ -93,7 +94,7 @@ impl Counting {
 
             let oldct = write_lock.num;
 
-            if newct == (oldct+1).rem_euclid(1000) {
+            if newct == (oldct).rem_euclid(1000)+1 {
                 (*write_lock).num = newct;
                 true
             } else { false }
@@ -101,7 +102,19 @@ impl Counting {
 
         if success {
             let connection = &mut db_conn()?;
-            add_points(connection, msg.author.id.into(), 5)?;
+
+            if newct == 1000 {
+                add_points(connection, msg.author.id.into(), 500)?;
+
+                /* Add 1000 role */
+                let memb = msg.member(&ctx.http()).await
+                    .map_err(DungeonBotError::from)?;
+                memb.add_role(&ctx.http(), ctrole).await
+                    .map_err(DungeonBotError::from)?;
+
+            } else {
+                add_points(connection, msg.author.id.into(), 3)?;
+            }
             set_ct(connection, newct)?;
 
             msg.react(&ctx.http, '✅').await
