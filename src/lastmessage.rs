@@ -8,7 +8,7 @@ use dotenvy::dotenv;
 
 use crate::error::DungeonBotError;
 use crate::{env_snowflake, hms};
-use crate::db::{db_conn, add_points};
+use crate::db::{db_conn, DbUser};
 use crate::error::Result;
 
 #[derive(Debug, Clone)]
@@ -127,11 +127,11 @@ impl LastMessage {
             };
 
             // Update database value
-            add_points(connection, curr.user.id.into(), (dt/STREAK_MULTIPLIER) as i32)
+            DbUser::add_points(connection, curr.user.id.into(), (dt/STREAK_MULTIPLIER) as i32)
                 .expect("Unable to add points");
 
             // Update database value
-            add_points(connection, new.user.id.into(), (dt/STREAK_BONUS_MULTIPLIER) as i32)
+            DbUser::add_points(connection, new.user.id.into(), (dt/STREAK_BONUS_MULTIPLIER) as i32)
                 .expect("Unable to add points");
 
             if dt >= 300 {

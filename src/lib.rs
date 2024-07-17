@@ -1,5 +1,5 @@
 pub mod db;
-use db::{models, schema};
+use db::schema;
 
 pub mod commands;
 pub mod lastmessage;

@@ -8,10 +8,8 @@ use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 use crate::counting::{set_ct, Counting};
 use crate::env_snowflake;
 use crate::lastmessage::LastMessage;
-use crate::models::User;
-use crate::db::{get_user, new_user, top_users, xfer_points};
+use crate::db::{db_conn, DbUser};
 use crate::error::{DungeonBotError, Result};
-use crate::db::db_conn;
 
 #[derive(Debug)]
 pub struct Data;
@@ -48,8 +46,8 @@ pub async fn leaderboard(
 
     let offset = (page-1) * 10;
     let mut i = offset + 1;
-    for user in top_users(connection, 10, offset) {
-        let User {
+    for user in DbUser::top(connection, 10, offset) {
+        let DbUser {
             id: user_id,
             points: pts
         } = user;
@@ -130,10 +128,10 @@ async fn aura_show(ctx: Context<'_>) -> Result<()> {
     };
 
     // Retrieve points from db
-    let User {
+    let DbUser {
         id:_,
         points
-    } = get_user(connection, user_id)?
+    } = DbUser::get(connection, user_id)?
         .ok_or(DungeonBotError::DbUserNotFoundError(user_id))?;
 
     let name = ctx.author_member().await
@@ -167,9 +165,9 @@ async fn aura_give(
     let from_id: u64 = ctx.author().id.into();
 
     let connection = &mut db_conn()?;
-    new_user(connection, to_id);
-    new_user(connection, from_id);
-    xfer_points(connection, to_id, from_id, pts as i32)?; 
+    DbUser::new(connection, to_id)?;
+    DbUser::new(connection, from_id)?;
+    DbUser::xfer_points(connection, to_id, from_id, pts as i32)?; 
 
     let from = ctx.author_member().await
         .ok_or(DungeonBotError::DiscordUserNotFoundError(from_id))?;

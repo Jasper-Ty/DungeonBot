@@ -5,7 +5,7 @@ use dotenvy::dotenv;
 use serenity::prelude::*;
 use serenity::all::{ChannelId, Message, RoleId};
 
-use crate::db::{add_points, db_conn};
+use crate::db::{db_conn, DbUser};
 use crate::env_snowflake;
 use crate::error::{DungeonBotError, Result};
 
@@ -104,7 +104,7 @@ impl Counting {
             let connection = &mut db_conn()?;
 
             if newct == 1000 {
-                add_points(connection, msg.author.id.into(), 500)?;
+                DbUser::add_points(connection, msg.author.id.into(), 500)?;
 
                 /* Add 1000 role */
                 let memb = msg.member(&ctx.http()).await
@@ -113,7 +113,7 @@ impl Counting {
                     .map_err(DungeonBotError::from)?;
 
             } else {
-                add_points(connection, msg.author.id.into(), 3)?;
+                DbUser::add_points(connection, msg.author.id.into(), 3)?;
             }
             set_ct(connection, newct)?;
 

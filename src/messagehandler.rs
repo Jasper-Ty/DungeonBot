@@ -2,7 +2,7 @@ use serenity::all::Message;
 use serenity::prelude::*;
 use serenity::async_trait;
 
-use crate::db::{db_conn, new_user};
+use crate::db::{db_conn, DbUser};
 use crate::lastmessage::LastMessage;
 use crate::counting::Counting;
 
@@ -16,7 +16,7 @@ impl EventHandler for MessageHandler {
 
         {
             let connection = &mut db_conn().unwrap();
-            new_user(connection, msg.author.id.into());
+            DbUser::new(connection, msg.author.id.into()).unwrap();
         }
         
         // Last Message
