@@ -1,5 +1,5 @@
 -- Your SQL goes here
 CREATE TABLE state (
-    key TEXT PRIMARY KEY,
+    key TEXT NOT NULL PRIMARY KEY,
     value TEXT NOT NULL
 );
