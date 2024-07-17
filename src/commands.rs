@@ -18,12 +18,6 @@ use crate::db::db_conn;
 pub struct Data;
 type Context<'a> = poise::Context<'a, Data, DungeonBotError>;
 
-#[poise::command(slash_command, prefix_command)]
-pub async fn ping(ctx: Context<'_>) -> Result<()> {
-    ctx.say("Pong!").await?;
-    Ok(())
-}
-
 /// Displays the leaderboard of the users with the
 /// highest aura in the server
 #[poise::command(
@@ -276,7 +270,7 @@ pub fn dungeonbot_framework(guild_id: GuildId) -> poise::Framework<Data, Dungeon
     owners.insert(jasper_id);
 
     let options = poise::FrameworkOptions {
-        commands: vec![ping(), leaderboard(), aura(), count()],
+        commands: vec![leaderboard(), aura(), count()],
         owners,
         ..Default::default()
     };
