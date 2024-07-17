@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 use std::fmt::Write;
-use std::error::Error;
 
 use poise::{CreateReply, FrameworkError};
 use serenity::all::{Member, Timestamp, UserId};
