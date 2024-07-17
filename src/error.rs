@@ -35,6 +35,9 @@ pub enum DungeonBotError {
     #[error("{0}")]
     CountingError(#[from] CountingError),
 
+    #[error("Change would cause User {0} to have an invalid number of points")]
+    DbUserPointError(u64),
+
     #[error("User {0} not found (database)")]
     DbUserNotFoundError(u64),
 
