@@ -103,6 +103,8 @@ pub fn xfer_points(
             .optional()?;
         if from.is_none() {
             return Err(DungeonBotError::DbUserNotFoundError(from_id))
+        } else if get_points(conn, from_id) - pts < 0 {
+            return Err(DungeonBotError::DbUserPointError(from_id))
         }
 
 
