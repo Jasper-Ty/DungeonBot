@@ -164,8 +164,6 @@ async fn aura_give(
     let to_id: u64 = to.user.id.into();
     let from_id: u64 = ctx.author().id.into();
 
-    ctx.say("Sorry, can't let this command be used yet").await?;
-
     let connection = &mut db_conn()?;
     new_user(connection, to_id);
     new_user(connection, from_id);
