@@ -2,7 +2,7 @@
 
 diesel::table! {
     state (key) {
-        key -> Nullable<Text>,
+        key -> Text,
         value -> Text,
     }
 }

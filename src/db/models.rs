@@ -1,4 +1,5 @@
 use diesel::prelude::*;
+
 use crate::schema::users;
 
 #[derive(Queryable, Selectable)]
@@ -14,3 +15,14 @@ pub struct User {
 pub struct NewUser {
     pub id: i64,
 }
+
+use crate::schema::state;
+
+#[derive(Queryable, Selectable, Insertable)]
+#[diesel(table_name = state)]
+#[diesel(check_for_backend(diesel::sqlite::Sqlite))]
+pub struct StateVar {
+    pub key: String,
+    pub value: String,
+}
+

@@ -2,6 +2,8 @@ use std::{env::VarError, error::Error, num::ParseIntError};
 
 use thiserror::Error;
 
+use crate::counting::CountingError;
+
 /// Big error class :flabbergasted:
 #[derive(Error, Debug)]
 pub enum DungeonBotError {
@@ -29,6 +31,9 @@ pub enum DungeonBotError {
         snowflake: String,
         source: ParseIntError,
     },
+
+    #[error("{0}")]
+    CountingError(#[from] CountingError),
 
     #[error("User {0} not found (database)")]
     DbUserNotFoundError(u64),

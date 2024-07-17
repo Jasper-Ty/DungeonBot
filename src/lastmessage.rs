@@ -8,7 +8,7 @@ use dotenvy::dotenv;
 
 use crate::error::DungeonBotError;
 use crate::{env_snowflake, hms};
-use crate::db::{db_conn, add_points, new_user};
+use crate::db::{db_conn, add_points};
 use crate::error::Result;
 
 #[derive(Debug, Clone)]
@@ -65,8 +65,7 @@ impl LastMessage {
         // No bots!
         if msg.author.bot { return Ok(()) }
 
-        // Create a new database entry and retrieve guild user
-        new_user(connection, msg.author.id.into());
+        // Retrieve guild user
         let new = msg.member(&ctx.http).await?;
 
         // Get the LMLock

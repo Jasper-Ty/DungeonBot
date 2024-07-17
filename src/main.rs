@@ -7,6 +7,7 @@ use serenity::prelude::*;
 use serenity::all::GuildId;
 
 use dungeonbot::lastmessage::LastMessage;
+use dungeonbot::counting::Counting;
 use dungeonbot::commands::dungeonbot_framework;
 use dungeonbot::error::{DungeonBotError, Result};
 
@@ -37,8 +38,8 @@ async fn main() -> Result<()> {
         .event_handler(MessageHandler)
         .await?; 
 
-    // Add LastMessageWinner to the global data dictionary
     LastMessage::install(&mut client).await;
+    Counting::install(&mut client).await;
 
     // Let's go!
     client.start()
