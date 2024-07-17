@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fmt::Write;
 use std::error::Error;
 
-use poise::CreateReply;
+use poise::{CreateReply, FrameworkError};
 use serenity::all::{Member, Timestamp, UserId};
 use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 
@@ -245,16 +245,42 @@ async fn count_set(
     Ok(())
 }
 
-async fn error_handler(error: poise::FrameworkError<'_, Data, DungeonBotError>) {
-    if let Some(ctx) = error.ctx() {
-        let mut err_reply_msg = format!("Oh noes, an error <:flabbergasted:1250998996596555817>. Please let Jasper know about this immediately.\n");
-        match error.source() {
-            Some(source_err) => write!(
-                err_reply_msg, "```{:?}\n{}```", source_err, source_err).unwrap(),
-            None => write!(err_reply_msg, "No source error?").unwrap(),
+async fn error_handler(framework_error: poise::FrameworkError<'_, Data, DungeonBotError>) {
+    let header = 
+        "Oh noes, an error \
+        <:flabbergasted:1250998996596555817>. \
+        Please let Jasper know about this immediately.\n";
+
+    match framework_error {
+        FrameworkError::NotAnOwner { ctx, .. } => {
+            let reply = "Sorry, only Jasper is allowed to use this command";
+            ctx.say(reply).await
+                .expect("Unable to send error handler reply");
         }
-        ctx.say(err_reply_msg).await
-            .expect("Unable to send error message");
+        FrameworkError::Command { ref error, ctx, .. } => {
+            let mut reply = header.to_string();
+
+            reply.push_str("```\n");
+            reply.push_str("[Command Error]\n");
+            write!(reply, "{}\n", error).unwrap();
+            reply.push_str("```");
+
+            ctx.say(reply).await
+                .expect("Unable to send error handler reply");
+        }
+        FrameworkError::CommandPanic { payload, ctx, .. } => {
+            let mut reply = header.to_string();
+
+            reply.push_str("```\n");
+            reply.push_str("[Command Panic]\n");
+            write!(reply, "{:?}\n", payload).unwrap();
+            reply.push_str("```");
+
+            ctx.say(reply).await
+                .expect("Unable to send error handler reply");
+        }
+        _ => {
+        }
     }
 }
 
