@@ -1,12 +1,10 @@
-use std::sync::Arc;
-use tokio::sync::RwLock; // Need async RwLock, will be holding across awaits
-                        
 use serenity::prelude::*;
 use serenity::all::{Message, UserId, RoleId, ChannelId, Member, Timestamp};
 
 use dotenvy::dotenv;
 
 use crate::error::DungeonBotError;
+use crate::messagehandler::{MsgSubsystem, MsgSubsystemAsyncLock};
 use crate::{env_snowflake, hms};
 use crate::db::{db_conn, DbUser};
 use crate::error::Result;
@@ -16,6 +14,7 @@ pub struct LastMessageData {
     memb: Member,
     timestamp: Timestamp,
 }
+
 impl LastMessageData {
     pub fn id(&self) -> UserId {
         self.memb.user.id
@@ -30,7 +29,7 @@ const STREAK_BONUS_MULTIPLIER: i64 = 40;
 
 /// The underlying async data structure that holds the
 /// last-message winner.
-pub type LMLock = Arc<RwLock<Option<LastMessageData>>>;
+type LMLock = MsgSubsystemAsyncLock<Option<LastMessageData>>;
 
 // Holds the user id of the current Last Message Winner
 // Serenity uses unit structs to set up the type system for
@@ -40,20 +39,14 @@ pub struct LastMessage;
 impl TypeMapKey for LastMessage {
     type Value = LMLock;
 }
-impl LastMessage {
-    /// Get the LastMessage RwLock from Context
-    pub async fn acquire_lock(ctx: &mut Context) -> Result<<Self as TypeMapKey>::Value> {
-        ctx.data.read().await.get::<Self>()
-            .ok_or(DungeonBotError::TypeMapKeyError("LastMessage".to_string()))
-            .cloned()
+impl MsgSubsystem for LastMessage {
+    type Data = Option<LastMessageData>;
+
+    fn name() -> String {
+        "Last Message".to_string()
     }
 
-    pub async fn install(client: &mut Client) {
-        let mut data = client.data.write().await;
-        data.insert::<Self>(Arc::new(RwLock::new(None)));
-    }
-
-    pub async fn handler(ctx: &mut Context, msg: &Message) -> Result<()> {
+    async fn handler(ctx: &mut Context, msg: &Message) -> Result<()> {
         dotenv().ok();
         let lmchannel: ChannelId = 
             env_snowflake("LAST_MESSAGE_CHANNEL_ID")?;
@@ -68,7 +61,7 @@ impl LastMessage {
         let new = msg.member(&ctx.http).await?;
 
         // Get the LMLock
-        let mut lmlock = LastMessage::acquire_lock(ctx).await?;
+        let mut lmlock = LastMessage::lock(ctx).await?;
 
         // If winner isn't changing, no-op.
         if !is_new_winner(&lmlock, &new).await {
@@ -143,6 +136,7 @@ impl LastMessage {
     }
 }
 
+/// Checks if the current winner (behind `rwlock`) is the same as `new`.
 async fn is_new_winner(rwlock: &LMLock, new: &Member) -> bool {
     let read_lock = rwlock.read().await;
 

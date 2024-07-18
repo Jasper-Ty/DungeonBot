@@ -38,7 +38,7 @@ async fn main() -> Result<()> {
         .event_handler(MessageHandler)
         .await?; 
 
-    LastMessage::install(&mut client).await;
+    LastMessage::install_data(&mut client).await;
     Counting::install_data(&mut client).await;
 
     // Let's go!
