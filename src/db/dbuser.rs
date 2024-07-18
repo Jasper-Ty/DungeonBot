@@ -33,8 +33,13 @@ impl DbUser {
             .values(&new_user)
             .on_conflict(id)
             .do_nothing()
-            .returning(Self::as_returning())
-            .get_result(conn)
+            .execute(conn)
+            .map_err(DungeonBotError::from)?;
+
+        users
+            .find(user_id)
+            .select(Self::as_select())
+            .first(conn)
             .map_err(DungeonBotError::from)
     }
 
