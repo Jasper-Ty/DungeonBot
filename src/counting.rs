@@ -1,5 +1,3 @@
-use std::sync::{Arc, RwLock, RwLockReadGuard, RwLockWriteGuard};
-
 use dotenvy::dotenv;
  
 use serenity::prelude::*;
@@ -8,6 +6,7 @@ use serenity::all::{ChannelId, Message, RoleId};
 use crate::db::{db_conn, DbUser};
 use crate::env_snowflake;
 use crate::error::{DungeonBotError, Result};
+use crate::messagehandler::{MsgSubsystem, MsgSubsystemLock};
 
 use thiserror::Error;
 
@@ -23,55 +22,27 @@ pub enum CountingError {
 pub struct CountingData {
     pub num: u64,
 }
-
-/// The underlying async data structure that holds the
-/// last-message winner.
-#[derive(Debug, Clone)]
-pub struct CountingLock(Arc<RwLock<CountingData>>); 
-impl CountingLock {
-    pub fn new(initial_ct: u64) -> Self {
-        Self(Arc::new(RwLock::new(
-            CountingData {
-                num: initial_ct,
-            } 
-        )))
-    }
-
-    pub fn read(&self) -> Result<RwLockReadGuard<CountingData>>{
-        self.0.read()
-            .map_err(|_| CountingError::CTLockReadError)
-            .map_err(DungeonBotError::from)
-    }
-
-    pub fn write(&self) -> Result<RwLockWriteGuard<CountingData>>{
-        self.0.write()
-            .map_err(|_| CountingError::CTLockWriteError)
-            .map_err(DungeonBotError::from)
+impl Default for CountingData {
+    fn default() -> Self {
+        Self {
+            num: 1000
+        }
     }
 }
 
 pub struct Counting;
 impl TypeMapKey for Counting {
-    type Value = CountingLock;
+    type Value = MsgSubsystemLock<CountingData>;
 }
-impl Counting {
-    pub async fn acquire_lock(ctx: &Context) -> Result<<Self as TypeMapKey>::Value> {
-        ctx.data.read().await.get::<Self>()
-            .ok_or(DungeonBotError::TypeMapKeyError("Counting".to_string()))
-            .cloned()
+
+impl MsgSubsystem for Counting {
+    type Data = CountingData;
+
+    fn name() -> String {
+        "Counting".to_string()
     }
 
-    pub async fn install(client: &mut Client) {
-        let saved_ct = {
-            let connection = &mut db_conn().unwrap();
-            get_saved_ct(connection).unwrap()
-        };
-        
-        let mut data = client.data.write().await;
-        data.insert::<Self>(CountingLock::new(saved_ct));
-    }
-
-    pub async fn handler(ctx: &mut Context, msg: &Message) -> Result<()> {
+    async fn handler(ctx: &mut Context, msg: &Message) -> Result<()> {
         dotenv().ok();
 
         let ctchannel: ChannelId = env_snowflake("COUNTING_CHANNEL_ID")?;
@@ -89,7 +60,7 @@ impl Counting {
             .map(str::parse::<u64>) else { return Ok(()) };
 
         let success = {
-            let ctlock = Counting::acquire_lock(ctx).await?;
+            let ctlock = Counting::lock(ctx).await?;
             let mut write_lock = ctlock.write()?;
 
             let oldct = write_lock.num;

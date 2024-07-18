@@ -21,7 +21,7 @@ pub enum MsgSubsystemError {
 }
 
 #[derive(Debug, Clone)]
-struct MsgSubsystemLock<T: Clone + Send + Sync + Default>(Arc<RwLock<T>>);
+pub struct MsgSubsystemLock<T: Clone + Send + Sync + Default>(Arc<RwLock<T>>);
 impl<T> MsgSubsystemLock<T> 
 where 
     T: Clone + Send + Sync + Default
@@ -52,7 +52,7 @@ where
     fn name() -> String;
 
     #[allow(async_fn_in_trait)]
-    async fn lock(ctx: &mut Context) -> Result<Self::Value> {
+    async fn lock(ctx: &Context) -> Result<Self::Value> {
         ctx.data.read().await.get::<Self>()
             .ok_or(DungeonBotError::TypeMapKeyError(Self::name()))
             .cloned()
@@ -65,7 +65,7 @@ where
     }
 
     #[allow(async_fn_in_trait)]
-    async fn handler(ctx: &mut Context, msg: &Message);
+    async fn handler(ctx: &mut Context, msg: &Message) -> Result<()>;
 }
 
 /// This unit struct denominates all message handlers

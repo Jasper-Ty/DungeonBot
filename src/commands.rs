@@ -10,6 +10,7 @@ use crate::env_snowflake;
 use crate::lastmessage::LastMessage;
 use crate::db::{db_conn, DbUser};
 use crate::error::{DungeonBotError, Result};
+use crate::messagehandler::MsgSubsystem;
 
 #[derive(Debug)]
 pub struct Data;
@@ -200,7 +201,7 @@ async fn count_show(ctx: Context<'_>) -> Result<()> {
     /* Get current count */
     let ct = {
         let ctx = ctx.serenity_context();
-        let ctlock = Counting::acquire_lock(ctx).await?;
+        let ctlock = Counting::lock(ctx).await?;
         let read_lock = ctlock.read()?;
 
         read_lock.num
@@ -230,7 +231,7 @@ async fn count_set(
     /* Set current count */
     {
         let ctx = ctx.serenity_context();
-        let ctlock = Counting::acquire_lock(ctx).await?;
+        let ctlock = Counting::lock(ctx).await?;
         let mut write_lock = ctlock.write()?;
 
         write_lock.num = count
