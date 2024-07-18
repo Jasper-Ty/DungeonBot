@@ -24,8 +24,14 @@ pub struct CountingData {
 }
 impl Default for CountingData {
     fn default() -> Self {
+        let num = {
+            let conn = &mut db_conn()
+                .expect("Unable to connect to db");
+            get_saved_ct(conn)
+                .expect("No saved count in database")
+        };
         Self {
-            num: 1000
+            num
         }
     }
 }

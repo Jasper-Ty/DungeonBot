@@ -4,8 +4,7 @@ use serenity::all::Message;
 use serenity::prelude::*;
 
 use crate::db::{db_conn, DbUser};
-use crate::lastmessage::LastMessage;
-use crate::counting::Counting;
+use crate::subsystems::{LastMessage, Counting};
 use crate::error::{DungeonBotError, Result};
 
 use thiserror::Error;

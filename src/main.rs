@@ -6,8 +6,7 @@ use dungeonbot::{env_snowflake, env_str};
 use serenity::prelude::*;
 use serenity::all::GuildId;
 
-use dungeonbot::lastmessage::LastMessage;
-use dungeonbot::counting::Counting;
+use dungeonbot::subsystems::{LastMessage, Counting};
 use dungeonbot::commands::dungeonbot_framework;
 use dungeonbot::error::{DungeonBotError, Result};
 

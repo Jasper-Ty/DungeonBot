@@ -2,8 +2,7 @@ pub mod db;
 use db::schema;
 
 pub mod commands;
-pub mod lastmessage;
-pub mod counting;
+pub mod subsystems;
 pub mod error;
 pub mod messagehandler;
 

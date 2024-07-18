@@ -2,7 +2,8 @@ use std::{env::VarError, error::Error, num::ParseIntError};
 
 use thiserror::Error;
 
-use crate::{counting::CountingError, messagehandler::MsgSubsystemError};
+use crate::subsystems::counting::CountingError; 
+use crate::messagehandler::MsgSubsystemError;
 
 /// Big error class :flabbergasted:
 #[derive(Error, Debug)]

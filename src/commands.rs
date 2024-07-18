@@ -5,9 +5,9 @@ use poise::{CreateReply, FrameworkError};
 use serenity::all::{Member, Timestamp, UserId};
 use serenity::builder::{CreateEmbed, CreateEmbedFooter};
 
-use crate::counting::{set_ct, Counting};
+use crate::subsystems::counting::{set_ct, Counting};
+use crate::subsystems::LastMessage;
 use crate::env_snowflake;
-use crate::lastmessage::LastMessage;
 use crate::db::{db_conn, DbUser};
 use crate::error::{DungeonBotError, Result};
 use crate::messagehandler::MsgSubsystem;
