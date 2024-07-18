@@ -1,16 +1,12 @@
-use std::sync::Arc;
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-
 use serenity::all::Message;
 use serenity::prelude::*;
-use serenity::async_trait;
-
-use thiserror::Error;
 
 use crate::db::{db_conn, DbUser};
 use crate::lastmessage::LastMessage;
 use crate::counting::Counting;
 use crate::error::{DungeonBotError, Result};
+
+use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum MsgSubsystemError {
@@ -20,31 +16,73 @@ pub enum MsgSubsystemError {
     LockWriteError(String),
 }
 
+/// Tag trait that covers both std::sync::RwLock and tokio::sync::RwLock
+pub trait RwLockType<T>: Clone + Send + Sync + Sized {
+    fn new() -> Self;
+}
+
+use std::sync::Arc;
+use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
+
 #[derive(Debug, Clone)]
-pub struct MsgSubsystemLock<T: Clone + Send + Sync + Default>(Arc<RwLock<T>>);
+pub struct MsgSubsystemLock<T: Clone + Send + Sync + Default + Sized>(Arc<RwLock<T>>);
 impl<T> MsgSubsystemLock<T> 
 where 
-    T: Clone + Send + Sync + Default
+    T: Clone + Send + Sync + Default + Sized
 {
-    fn new() -> Self {
-        return Self(Arc::new(RwLock::new(<T as Default>::default())));
-    }
-
-    pub fn read<'a>(&'a self) -> Result<RwLockReadGuard<T>>{
+    pub fn read(&self) -> Result<RwLockReadGuard<T>> {
         self.0.read()
             .map_err(|e| MsgSubsystemError::LockReadError(format!("{}", e)))
             .map_err(DungeonBotError::from)
     }
 
-    pub fn write(&self) -> Result<RwLockWriteGuard<T>>{
+    pub fn write(&self) -> Result<RwLockWriteGuard<T>> {
         self.0.write()
             .map_err(|e| MsgSubsystemError::LockWriteError(format!("{}", e)))
             .map_err(DungeonBotError::from)
     }
 }
 
-pub trait MsgSubsystem: TypeMapKey<Value=MsgSubsystemLock<Self::Data>> + Sized 
+impl<T> RwLockType<T> for MsgSubsystemLock<T>
 where 
+    T: Clone + Send + Sync + Default + Sized
+{
+    fn new() -> Self {
+        return Self(Arc::new(RwLock::new(<T as Default>::default())));
+    }
+}
+
+use tokio::sync::RwLock as AsyncRwLock;
+use tokio::sync::RwLockReadGuard as AsyncRwLockReadGuard;
+use tokio::sync::RwLockWriteGuard as AsyncRwLockWriteGuard;
+
+#[derive(Debug, Clone)]
+pub struct MsgSubsystemAsyncLock<T: Clone + Send + Sync + Default>(Arc<AsyncRwLock<T>>);
+impl<T> MsgSubsystemAsyncLock<T> 
+where 
+    T: Clone + Send + Sync + Default
+{
+    pub async fn read<'a>(&'a self) -> AsyncRwLockReadGuard<T> {
+        self.0.read().await
+    }
+
+    pub async fn write<'a>(&'a self) -> AsyncRwLockWriteGuard<T> {
+        self.0.write().await
+    }
+}
+
+impl<T> RwLockType<T> for MsgSubsystemAsyncLock<T>
+where 
+    T: Clone + Send + Sync + Default + Sized
+{
+    fn new() -> Self {
+        return Self(Arc::new(AsyncRwLock::new(<T as Default>::default())));
+    }
+}
+
+pub trait MsgSubsystem: TypeMapKey + Sized 
+where 
+    <Self as TypeMapKey>::Value: RwLockType<<Self as MsgSubsystem>::Data>,
     <Self as MsgSubsystem>::Data: Clone + Send + Sync + Default
 {
     type Data;
@@ -68,6 +106,8 @@ where
     async fn handler(ctx: &mut Context, msg: &Message) -> Result<()>;
 }
 
+use serenity::async_trait;
+
 /// This unit struct denominates all message handlers
 /// via Serenity's EventHandler trait
 pub struct MessageHandler;
@@ -87,10 +127,17 @@ impl EventHandler for MessageHandler {
         
         // Last Message
         LastMessage::handler(&mut ctx, &msg).await
+            .or_else(|err| error_handler(&mut ctx, &msg, err))
             .unwrap();
 
         // Counting
         Counting::handler(&mut ctx, &msg).await
+            .or_else(|err| error_handler(&mut ctx, &msg, err))
             .unwrap();
     }
+}
+
+#[allow(unused_variables)]
+fn error_handler(ctx: &mut Context, msg: &Message, err: DungeonBotError) -> Result<()> {
+    unimplemented!();
 }

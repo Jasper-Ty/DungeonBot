@@ -30,9 +30,11 @@ impl Default for CountingData {
     }
 }
 
+type CountingLock = MsgSubsystemLock<CountingData>;
+
 pub struct Counting;
 impl TypeMapKey for Counting {
-    type Value = MsgSubsystemLock<CountingData>;
+    type Value = CountingLock;
 }
 
 impl MsgSubsystem for Counting {
