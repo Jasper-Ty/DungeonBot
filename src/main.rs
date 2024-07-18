@@ -1,7 +1,7 @@
 use dotenvy::dotenv;
 
 use dungeonbot::db::{db_conn, run_migrations};
-use dungeonbot::messagehandler::MessageHandler;
+use dungeonbot::messagehandler::{MessageHandler, MsgSubsystem};
 use dungeonbot::{env_snowflake, env_str};
 use serenity::prelude::*;
 use serenity::all::GuildId;
@@ -39,7 +39,7 @@ async fn main() -> Result<()> {
         .await?; 
 
     LastMessage::install(&mut client).await;
-    Counting::install(&mut client).await;
+    Counting::install_data(&mut client).await;
 
     // Let's go!
     client.start()
