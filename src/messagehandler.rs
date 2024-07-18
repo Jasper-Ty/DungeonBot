@@ -1,3 +1,5 @@
+use std::fmt::Write;
+
 use serenity::all::Message;
 use serenity::prelude::*;
 
@@ -117,27 +119,40 @@ impl EventHandler for MessageHandler {
     async fn message(&self, mut ctx: Context, msg: Message) {
 
         // No bots!
-
         if msg.author.bot { return }
 
         {
             let connection = &mut db_conn().unwrap();
             DbUser::new(connection, msg.author.id.into()).unwrap();
         }
-        
+
         // Last Message
-        LastMessage::handler(&mut ctx, &msg).await
-            .or_else(|err| error_handler(&mut ctx, &msg, err))
-            .unwrap();
+        match LastMessage::handler(&mut ctx, &msg).await {
+            Err(err) => error_handler(&mut ctx, &msg, err).await,
+            _ => {}
+        }
 
         // Counting
-        Counting::handler(&mut ctx, &msg).await
-            .or_else(|err| error_handler(&mut ctx, &msg, err))
-            .unwrap();
+        match Counting::handler(&mut ctx, &msg).await {
+            Err(err) => error_handler(&mut ctx, &msg, err).await,
+            _ => {}
+        }
     }
 }
 
-#[allow(unused_variables)]
-fn error_handler(ctx: &mut Context, msg: &Message, err: DungeonBotError) -> Result<()> {
-    unimplemented!();
+async fn error_handler(ctx: &mut Context, msg: &Message, err: DungeonBotError) {
+    let header = 
+        "Oh noes, an error \
+        <:flabbergasted:1250998996596555817>. \
+        Please let Jasper know about this immediately.\n";
+
+    let mut reply = header.to_string();
+    if let Ok(channel_id) = msg.channel(&ctx.http).await {
+        reply.push_str("```\n");
+        reply.push_str("[Message Subsystem Error]\n");
+        write!(reply, "{}\n", err).unwrap();
+        reply.push_str("```");
+        channel_id.id().say(&ctx.http, reply).await
+            .expect("Unable to send error handler reply");
+    }
 }
