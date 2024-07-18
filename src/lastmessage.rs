@@ -47,6 +47,7 @@ impl LastMessage {
             .ok_or(DungeonBotError::TypeMapKeyError("LastMessage".to_string()))
             .cloned()
     }
+
     pub async fn install(client: &mut Client) {
         let mut data = client.data.write().await;
         data.insert::<Self>(Arc::new(RwLock::new(None)));
@@ -62,8 +63,6 @@ impl LastMessage {
 
         // Don't care if it's not in the right channel!
         if msg.channel_id != lmchannel { return Ok(()) }
-        // No bots!
-        if msg.author.bot { return Ok(()) }
 
         // Retrieve guild user
         let new = msg.member(&ctx.http).await?;

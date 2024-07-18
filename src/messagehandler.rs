@@ -76,6 +76,10 @@ pub struct MessageHandler;
 impl EventHandler for MessageHandler {
     async fn message(&self, mut ctx: Context, msg: Message) {
 
+        // No bots!
+
+        if msg.author.bot { return }
+
         {
             let connection = &mut db_conn().unwrap();
             DbUser::new(connection, msg.author.id.into()).unwrap();

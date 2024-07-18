@@ -50,8 +50,6 @@ impl MsgSubsystem for Counting {
 
         // Don't care if it's not in the right channel!
         if msg.channel_id != ctchannel { return Ok(()) }
-        // No bots!
-        if msg.author.bot { return Ok(()) }
 
         // Attempt to parse first word of message
         let Some(Ok(newct)) = msg.content
