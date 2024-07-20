@@ -1,3 +1,6 @@
+use tracing::info;
+use tracing_subscriber;
+
 use dotenvy::dotenv;
 
 use dungeonbot::db::{db_conn, run_migrations};
@@ -15,32 +18,38 @@ async fn main() -> Result<()> {
 
     dotenv().ok();
 
-    // Run pending migrations
+    tracing_subscriber::fmt::init();
+
+    info!("Running pending migrations");
     {
         let conn = &mut db_conn()?;
         run_migrations(conn)?;
     }
+    info!("Done");
 
     let guild_id: GuildId = env_snowflake("GUILD_ID")?;
     let bot_token = env_str("BOT_TOKEN")?;
-
     let intents = GatewayIntents::GUILD_MESSAGES 
         | GatewayIntents::DIRECT_MESSAGES 
         | GatewayIntents::MESSAGE_CONTENT;
 
-    // Build framework
+    info!("Building poise framework");
     let framework = dungeonbot_framework(guild_id);
+    info!("Done");
 
-    // Build client
+    info!("Building serenity client");
     let mut client = Client::builder(&bot_token, intents)
         .framework(framework)
         .event_handler(MessageHandler)
         .await?; 
+    info!("Done");
 
+    info!("Installing subsystem data");
     LastMessage::install_data(&mut client).await;
     Counting::install_data(&mut client).await;
+    info!("Done");
 
-    // Let's go!
+    info!("Now starting DungeonBot!");
     client.start()
         .await
         .map_err(DungeonBotError::from)

@@ -9,9 +9,12 @@ pub mod messagehandler;
 use std::env;
 use error::{DungeonBotError, Result};
 
+use tracing::debug;
+
 /// Convenience function for getting a type whose underlying
 /// id data type is a snowflake (e.g a user id).
 pub fn env_snowflake<T: From<u64>> (key: &str) -> Result<T> {
+    debug!(key, "env_snowflake");
     Ok(T::from(
         env::var(key)
             .map_err(|e| 
@@ -30,6 +33,7 @@ pub fn env_snowflake<T: From<u64>> (key: &str) -> Result<T> {
 
 
 pub fn env_str(key: &str) -> Result<String> {
+    debug!(key, "env_str");
     env::var(key)
         .map_err(|e| 
                  DungeonBotError::EnvVarError { 
