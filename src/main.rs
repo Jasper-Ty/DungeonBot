@@ -4,7 +4,8 @@ use tracing_subscriber;
 use dotenvy::dotenv;
 
 use dungeonbot::db::{db_conn, run_migrations};
-use dungeonbot::messagehandler::{MessageHandler, MsgSubsystem};
+use dungeonbot::subsystems::{Subsystem, Tax};
+use dungeonbot::messagehandler::MessageHandler;
 use dungeonbot::{env_snowflake, env_str};
 use serenity::prelude::*;
 use serenity::all::GuildId;
@@ -40,13 +41,16 @@ async fn main() -> Result<()> {
     info!("Building serenity client");
     let mut client = Client::builder(&bot_token, intents)
         .framework(framework)
-        .event_handler(MessageHandler)
-        .await?; 
-    info!("Done");
-
+        .event_handler(MessageHandler);
+    
     info!("Installing subsystem data");
-    LastMessage::install_data(&mut client).await;
-    Counting::install_data(&mut client).await;
+    client = LastMessage::install(client); 
+    client = Counting::install(client);
+    client = Tax::install(client);
+
+    let mut client = client.await
+        .map_err(DungeonBotError::from)?;
+
     info!("Done");
 
     info!("Now starting DungeonBot!");

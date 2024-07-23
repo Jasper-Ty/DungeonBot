@@ -3,7 +3,7 @@ use std::{env::VarError, error::Error, num::ParseIntError};
 use thiserror::Error;
 
 use crate::subsystems::counting::CountingError; 
-use crate::messagehandler::MsgSubsystemError;
+use crate::subsystems::SubsystemError;
 
 /// Big error class :flabbergasted:
 #[derive(Error, Debug)]
@@ -37,7 +37,7 @@ pub enum DungeonBotError {
     CountingError(#[from] CountingError),
 
     #[error("Message subsystem error: {0}")]
-    MsgSubsystemError(#[from] MsgSubsystemError),
+    SubsystemError(#[from] SubsystemError),
 
     #[error("User {0} not found (database)")]
     DbUserNotFoundError(u64),

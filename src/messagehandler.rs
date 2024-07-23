@@ -4,108 +4,8 @@ use serenity::all::Message;
 use serenity::prelude::*;
 
 use crate::db::{db_conn, DbUser};
-use crate::subsystems::{LastMessage, Counting};
-use crate::error::{DungeonBotError, Result};
-
-use thiserror::Error;
-
-#[derive(Error, Debug)]
-pub enum MsgSubsystemError {
-    #[error("Error acquiring subsystem lock (read): {0}")]
-    LockReadError(String),
-    #[error("Error acquiring subsystem lock (write): {0}")]
-    LockWriteError(String),
-}
-
-/// Tag trait that covers both std::sync::RwLock and tokio::sync::RwLock
-pub trait RwLockType<T>: Clone + Send + Sync + Sized {
-    fn new() -> Self;
-}
-
-use std::sync::Arc;
-use std::sync::{RwLock, RwLockReadGuard, RwLockWriteGuard};
-
-#[derive(Debug, Clone)]
-pub struct MsgSubsystemLock<T: Clone + Send + Sync + Default + Sized>(Arc<RwLock<T>>);
-impl<T> MsgSubsystemLock<T> 
-where 
-    T: Clone + Send + Sync + Default + Sized
-{
-    pub fn read(&self) -> Result<RwLockReadGuard<T>> {
-        self.0.read()
-            .map_err(|e| MsgSubsystemError::LockReadError(format!("{}", e)))
-            .map_err(DungeonBotError::from)
-    }
-
-    pub fn write(&self) -> Result<RwLockWriteGuard<T>> {
-        self.0.write()
-            .map_err(|e| MsgSubsystemError::LockWriteError(format!("{}", e)))
-            .map_err(DungeonBotError::from)
-    }
-}
-
-impl<T> RwLockType<T> for MsgSubsystemLock<T>
-where 
-    T: Clone + Send + Sync + Default + Sized
-{
-    fn new() -> Self {
-        return Self(Arc::new(RwLock::new(<T as Default>::default())));
-    }
-}
-
-use tokio::sync::RwLock as AsyncRwLock;
-use tokio::sync::RwLockReadGuard as AsyncRwLockReadGuard;
-use tokio::sync::RwLockWriteGuard as AsyncRwLockWriteGuard;
-
-#[derive(Debug, Clone)]
-pub struct MsgSubsystemAsyncLock<T: Clone + Send + Sync + Default>(Arc<AsyncRwLock<T>>);
-impl<T> MsgSubsystemAsyncLock<T> 
-where 
-    T: Clone + Send + Sync + Default
-{
-    pub async fn read<'a>(&'a self) -> AsyncRwLockReadGuard<T> {
-        self.0.read().await
-    }
-
-    pub async fn write<'a>(&'a self) -> AsyncRwLockWriteGuard<T> {
-        self.0.write().await
-    }
-}
-
-impl<T> RwLockType<T> for MsgSubsystemAsyncLock<T>
-where 
-    T: Clone + Send + Sync + Default + Sized
-{
-    fn new() -> Self {
-        return Self(Arc::new(AsyncRwLock::new(<T as Default>::default())));
-    }
-}
-
-pub trait MsgSubsystem: TypeMapKey + Sized 
-where 
-    <Self as TypeMapKey>::Value: RwLockType<<Self as MsgSubsystem>::Data>,
-    <Self as MsgSubsystem>::Data: Clone + Send + Sync + Default
-{
-    type Data;
-
-    fn name() -> String;
-
-    #[allow(async_fn_in_trait)]
-    async fn lock(ctx: &Context) -> Result<Self::Value> {
-        ctx.data.read().await.get::<Self>()
-            .ok_or(DungeonBotError::TypeMapKeyError(Self::name()))
-            .cloned()
-    }
-
-    #[allow(async_fn_in_trait)]
-    async fn install_data(client: &mut Client) {
-        let mut data = client.data.write().await;
-        data.insert::<Self>(<Self as TypeMapKey>::Value::new());
-    }
-
-    #[allow(async_fn_in_trait)]
-    async fn handler(ctx: &mut Context, msg: &Message) -> Result<()>;
-}
+use crate::subsystems::{Counting, LastMessage, Tax, Subsystem};
+use crate::error::DungeonBotError;
 
 use serenity::async_trait;
 
@@ -125,15 +25,13 @@ impl EventHandler for MessageHandler {
             DbUser::new(connection, msg.author.id.into()).unwrap();
         }
 
-        // Last Message
-        match LastMessage::handler(&mut ctx, &msg).await {
-            Err(err) => error_handler(&mut ctx, &msg, err).await,
-            _ => {}
-        }
+        let res = Ok(())
+            .and(LastMessage::message_handler(&mut ctx, &msg).await)
+            .and(Counting::message_handler(&mut ctx, &msg).await)
+            .and(Tax::message_handler(&mut ctx, &msg).await);
 
-        // Counting
-        match Counting::handler(&mut ctx, &msg).await {
-            Err(err) => error_handler(&mut ctx, &msg, err).await,
+        match res {
+            Err(e) => error_handler(&mut ctx, &msg, e).await,
             _ => {}
         }
     }

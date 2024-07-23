@@ -20,6 +20,15 @@ pub struct NewDbUser {
 use crate::error::{DungeonBotError, Result};
 
 impl DbUser {
+    /// Returns the total number of users
+    pub fn count(conn: &mut SqliteConnection) -> Result<i64> {
+        use schema::users::dsl::*;
+
+        users
+            .count()
+            .get_result(conn)
+            .map_err(DungeonBotError::from)
+    }
 
     /// Creates a new DbUser with id `user_id`.
     /// Returns the created or existing DbUser.

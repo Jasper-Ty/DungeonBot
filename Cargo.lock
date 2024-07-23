@@ -423,6 +423,7 @@ dependencies = [
  "diesel_migrations",
  "dotenvy",
  "poise",
+ "rand",
  "serenity",
  "thiserror",
  "tokio",

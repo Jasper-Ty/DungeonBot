@@ -4,10 +4,11 @@ use serenity::all::{Message, UserId, RoleId, ChannelId, Member, Timestamp};
 use dotenvy::dotenv;
 
 use crate::error::DungeonBotError;
-use crate::messagehandler::{MsgSubsystem, MsgSubsystemAsyncLock};
 use crate::{env_snowflake, hms};
 use crate::db::{db_conn, DbUser};
 use crate::error::Result;
+
+use super::subsystem::{Subsystem, AsyncRwLock};
 
 #[derive(Debug, Clone)]
 pub struct LastMessageData {
@@ -29,7 +30,7 @@ const STREAK_BONUS_MULTIPLIER: i64 = 40;
 
 /// The underlying async data structure that holds the
 /// last-message winner.
-type LMLock = MsgSubsystemAsyncLock<Option<LastMessageData>>;
+type LMLock = AsyncRwLock<Option<LastMessageData>>;
 
 // Holds the user id of the current Last Message Winner
 // Serenity uses unit structs to set up the type system for
@@ -39,19 +40,14 @@ pub struct LastMessage;
 impl TypeMapKey for LastMessage {
     type Value = LMLock;
 }
-impl MsgSubsystem for LastMessage {
+
+impl Subsystem for LastMessage {
     type Data = Option<LastMessageData>;
 
-    fn name() -> String {
-        "Last Message".to_string()
-    }
-
-    async fn handler(ctx: &mut Context, msg: &Message) -> Result<()> {
+    async fn message_handler(ctx: &mut Context, msg: &Message) -> Result<()> {
         dotenv().ok();
         let lmchannel: ChannelId = 
             env_snowflake("LAST_MESSAGE_CHANNEL_ID")?;
-        let lmrole: RoleId = 
-            env_snowflake("LAST_MESSAGE_ROLE_ID")?;
         let connection = &mut db_conn()?;
 
         // Don't care if it's not in the right channel!
@@ -60,11 +56,8 @@ impl MsgSubsystem for LastMessage {
         // Retrieve guild user
         let new = msg.member(&ctx.http).await?;
 
-        // Get the LMLock
-        let mut lmlock = LastMessage::lock(ctx).await?;
-
         // If winner isn't changing, no-op.
-        if !is_new_winner(&lmlock, &new).await {
+        if !Self::is_new_winner(ctx, &new).await? {
             return Ok(())
         }
 
@@ -84,26 +77,16 @@ impl MsgSubsystem for LastMessage {
          */
 
         // (a)
-        let lmdata = pop_curr_winner(
-            ctx, 
-            &mut lmlock, 
-            &lmrole
-        ).await?;
+        let lmdata = Self::pop(ctx).await?;
 
         // (b)
-        set_new_winner(
-            ctx, 
-            &mut lmlock, 
-            &lmrole, 
-            &new, 
-            &msg.timestamp
-        ).await?;
+        Self::push(ctx, new.clone(), msg.timestamp).await?;
 
         /*
          * Then, once the Discord side is finished, the database side is much easier and much more
          * reliable, and we always try to do 
          *
-         * c. Hand out points to streak winner
+         * c. Hand out points to streak holder, and bonus to streak breaker
          */
 
         // (c)
@@ -118,17 +101,14 @@ impl MsgSubsystem for LastMessage {
                 t1 - t0
             };
 
-            // Update database value
-            DbUser::add_points(connection, curr.user.id.into(), (dt/STREAK_MULTIPLIER) as i32)
-                .expect("Unable to add points");
+            // Award streak to previous member
+            DbUser::add_points(connection, curr.user.id.into(), (dt/STREAK_MULTIPLIER) as i32)?;
 
-            // Update database value
-            DbUser::add_points(connection, new.user.id.into(), (dt/STREAK_BONUS_MULTIPLIER) as i32)
-                .expect("Unable to add points");
+            // Award streak break bonus to new member
+            DbUser::add_points(connection, new.user.id.into(), (dt/STREAK_BONUS_MULTIPLIER) as i32)?;
 
             if dt >= 300 {
-                streak_message(ctx, &curr, &new, dt, lmchannel).await
-                    .expect("Error sending streak message");
+                Self::streak_message(ctx, &curr, &new, dt, lmchannel).await?;
             }
         }
 
@@ -136,86 +116,135 @@ impl MsgSubsystem for LastMessage {
     }
 }
 
-/// Checks if the current winner (behind `rwlock`) is the same as `new`.
-async fn is_new_winner(rwlock: &LMLock, new: &Member) -> bool {
-    let read_lock = rwlock.read().await;
+impl LastMessage {
+    pub async fn state(ctx: &Context) -> Result<Option<(Member, i64)>> {
+        let lmlock = Self::lock(ctx).await?;
+        let read_lock = lmlock.read().await?;
 
-    if let Some(LastMessageData { 
-        memb: curr, 
-        timestamp: _ 
-    }) = read_lock.as_ref() {
-        curr.user.id != new.user.id
-    } else {
-        true
+        Ok(read_lock.as_ref()
+            .map(|LastMessageData { memb, timestamp }| 
+                 (memb.clone(), Timestamp::now().timestamp() - timestamp.timestamp())
+                 ))
     }
-}
 
-/// Attempts to remove the current winner in the LMLock
-async fn pop_curr_winner(
-    ctx: &mut Context, 
-    rwlock: &mut LMLock, 
-    lmrole: &RoleId
-) -> Result<Option<LastMessageData>> {
-    let mut write_lock = rwlock.write().await;
+    pub async fn current_streak(ctx: &Context) -> Result<Option<i64>> {
+        let lmlock = Self::lock(ctx).await?;
+        let read_lock = lmlock.read().await?;
 
-    // Get LastMessageData
-    let lmdata = write_lock.clone();
+        Ok(read_lock.as_ref()
+            .map(|LastMessageData { timestamp, .. }| 
+                Timestamp::now().timestamp() - timestamp.timestamp()
+            ))
+    }
 
-    // Remove previous winner from role
-    if let Some(LastMessageData{ memb: curr, timestamp: _ }) = lmdata.as_ref() {
-        curr.remove_role(&ctx.http, lmrole).await
+    pub async fn get_winner(ctx: &Context) -> Result<Option<Member>> {
+        let lmlock = Self::lock(ctx).await?;
+        let read_lock = lmlock.read().await?;
+
+        Ok(read_lock.as_ref()
+            .map(|LastMessageData { memb, .. }| memb.clone()))
+    }
+
+    pub async fn set_winner(
+        ctx: &Context, 
+        memb: Member, 
+        timestamp: Timestamp
+    ) -> Result<()> {
+        let lmlock = Self::lock(ctx).await?;
+        let mut write_lock = lmlock.write().await?;
+
+        *write_lock = Some(LastMessageData { memb, timestamp });
+
+        Ok(())
+    }
+
+    /// Checks if the current winner is the same as `new`.
+    pub async fn is_new_winner(
+        ctx: &Context, 
+        new: &Member
+    ) -> Result<bool> {
+        if let Some(curr) = Self::get_winner(ctx).await? {
+            Ok(curr.user.id != new.user.id)
+        } else {
+            Ok(true)
+        }
+    }
+
+    /// Attempts to remove the current winner, and gives them
+    /// the last message role
+    ///
+    /// This has to be done atomically, hence we write lock code in here
+    async fn pop(ctx: &Context) -> Result<Option<LastMessageData>> {
+        let lmrole: RoleId = 
+            env_snowflake("LAST_MESSAGE_ROLE_ID")?;
+
+        // Acquire lock
+        let lmlock = Self::lock(ctx).await?;
+        let mut write_lock = lmlock.write().await?;
+
+        // Get LastMessageData
+        let lmdata = write_lock.clone();
+
+        // Remove previous winner from role
+        if let Some(LastMessageData{ memb: curr, timestamp: _ }) = lmdata.as_ref() {
+            curr.remove_role(&ctx.http, lmrole).await
+                .map_err(DungeonBotError::from)?;
+        }
+
+        // Clear lock
+        *write_lock = None;
+
+        Ok(lmdata)
+    }
+
+    /// Sets a new winner, and gives them the last message role
+    ///
+    /// This has to be done atomically, hence we write lock code in here
+    async fn push(
+        ctx: &mut Context, 
+        memb: Member,
+        timestamp: Timestamp
+    ) -> Result<()> {
+        let lmrole: RoleId = 
+            env_snowflake("LAST_MESSAGE_ROLE_ID")?;
+
+        // Acquire lock
+        let lmlock = Self::lock(ctx).await?;
+        let mut write_lock = lmlock.write().await?;
+
+        // Add new winner to role
+        memb.add_role(&ctx.http, lmrole).await
             .map_err(DungeonBotError::from)?;
+
+        // Update value in lock
+        *write_lock = Some(LastMessageData {
+            memb,
+            timestamp
+        });
+
+        Ok(())
     }
 
-    // Clear LMLock
-    *write_lock = None;
+    /// Sends a streak message
+    async fn streak_message(
+        ctx: &mut Context, 
+        curr: &Member,
+        new: &Member,
+        dt: i64,
+        channel: ChannelId
+    ) -> Result<()> {
 
-    Ok(lmdata)
-}
+        let streak_message = format!(
+            "😱 {} broke {}'s {} last message streak! As a bonus, they earn {} aura.", 
+            new.display_name(),
+            curr.display_name(),
+            hms(dt),
+            dt/STREAK_BONUS_MULTIPLIER
+        );
 
+        channel.say(&ctx.http, streak_message).await     
+            .map_err(DungeonBotError::from)?;
 
-/// Sends the streak message
-async fn streak_message(
-    ctx: &mut Context, 
-    curr: &Member,
-    new: &Member,
-    dt: i64,
-    lmchannel: ChannelId
-) -> Result<()> {
-
-    let streak_message = format!(
-        "😱 {} broke {}'s {} last message streak! As a bonus, they earn {} aura.", 
-        new.display_name(),
-        curr.display_name(),
-        hms(dt),
-        dt/STREAK_BONUS_MULTIPLIER
-    );
-
-    lmchannel.say(&ctx.http, streak_message).await     
-        .map_err(DungeonBotError::from)?;
-
-    Ok(())
-}
-
-/// Sets a new winner in LMLock
-async fn set_new_winner(
-    ctx: &mut Context, 
-    rwlock: &mut LMLock, 
-    lmrole: &RoleId,
-    new: &Member,
-    timestamp: &Timestamp
-) -> Result<()> {
-    let mut write_lock = rwlock.write().await;
-
-    // Add new winner to role
-    new.add_role(&ctx.http, lmrole).await
-        .map_err(DungeonBotError::from)?;
-
-    // Update value in mutex
-    *write_lock = Some(LastMessageData {
-        memb: new.clone(),
-        timestamp: timestamp.clone()
-    });
-
-    Ok(())
+        Ok(())
+    }
 }
