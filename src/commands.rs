@@ -46,10 +46,12 @@ pub async fn leaderboard(
         } = user;
         let user_id = user_id as u64;
 
-        let user = UserId::new(user_id)
+        let Ok(user) = UserId::new(user_id)
             .to_user(&ctx.http())
-            .await
-            .expect("Unable to find user");
+            .await else {
+                i+= 1;
+                continue
+            };
 
         let mut title = format!("{}. {}", i, user.name.to_string());
         let mut body = format!("{} aura", pts);
@@ -209,6 +211,8 @@ async fn aura_add(
     #[description="Recipient"] to: Member,
     #[description="Amount of aura to give"] 
     pts: i32,
+    #[description="Reason"]
+    why: Option<String>,
 ) -> Result<()> {
     let to_id: u64 = to.user.id.into();
 
@@ -224,10 +228,26 @@ async fn aura_add(
 
     DbUser::add_points(connection, to_id, pts)?; 
 
+    let prefix = match pts {
+        ..=-1 => format!("<:minus:1265458447541997609>"),
+        0 => format!(""),
+        1.. => format!("<:plus:1265458429502291979>")
+    };
+    let verb = match pts {
+        ..=-1 => format!("loses"),
+        0 => format!(""),
+        1.. => format!("gains"),
+    };
+    let why = why
+        .unwrap_or("No reason given".to_string());
     let reply = format!(
-        "Added {} aura to {}.", 
-        pts, 
-        to.display_name());
+        "{} | **{}** {} **{}** aura `{}`", 
+        prefix,
+        to.display_name(),
+        verb,
+        pts.abs(),
+        why
+        );
     ctx.say(reply).await?;
     Ok(())
 }
@@ -256,7 +276,7 @@ async fn count_show(ctx: Context<'_>) -> Result<()> {
     Ok(())
 }
 
-/// Sets the current count (JASPER ONLY)
+/// [JASPER ONLY] Sets the current count
 #[poise::command(
     slash_command,
     owners_only,

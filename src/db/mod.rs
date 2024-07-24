@@ -15,14 +15,11 @@ use diesel::prelude::*;
 use crate::env_str;
 use crate::error::{DungeonBotError, Result};
 
-use tracing::debug;
-
 /// Creates a connection to the current Dungeon database.
 pub fn db_conn() -> Result<SqliteConnection> {
     dotenv().ok();
 
     let database_url = env_str("DATABASE_URL")?;
-    debug!(database_url, "Database URL");
     SqliteConnection::establish(&database_url)
         .map_err(DungeonBotError::from)
 }

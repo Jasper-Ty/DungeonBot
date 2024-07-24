@@ -248,3 +248,17 @@ impl LastMessage {
         Ok(())
     }
 }
+
+use serenity::async_trait;
+
+#[async_trait]
+impl EventHandler for LastMessage {
+    async fn message(&self, mut ctx: Context, msg: Message) {
+
+        if msg.author.bot { return }
+
+        if let Err(err) = Self::message_handler(&mut ctx, &msg).await {
+            Self::error_handler(&mut ctx, &msg, err).await;
+        }
+    }
+}

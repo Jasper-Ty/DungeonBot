@@ -4,7 +4,6 @@ use db::schema;
 pub mod commands;
 pub mod subsystems;
 pub mod error;
-pub mod messagehandler;
 
 use std::env;
 use error::{DungeonBotError, Result};

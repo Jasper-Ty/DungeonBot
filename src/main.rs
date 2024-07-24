@@ -5,7 +5,6 @@ use dotenvy::dotenv;
 
 use dungeonbot::db::{db_conn, run_migrations};
 use dungeonbot::subsystems::{Subsystem, Tax};
-use dungeonbot::messagehandler::MessageHandler;
 use dungeonbot::{env_snowflake, env_str};
 use serenity::prelude::*;
 use serenity::all::GuildId;
@@ -41,14 +40,13 @@ async fn main() -> Result<()> {
     info!("Building serenity client");
     let mut client = Client::builder(&bot_token, intents)
         .framework(framework)
-        .event_handler(MessageHandler);
-    
-    info!("Installing subsystem data");
-    client = LastMessage::install(client); 
-    client = Counting::install(client);
-    client = Tax::install(client);
-
-    let mut client = client.await
+        .type_map_insert::<Counting>(Counting::data())
+        .event_handler(Counting)
+        .type_map_insert::<LastMessage>(LastMessage::data())
+        .event_handler(LastMessage)
+        .type_map_insert::<Tax>(Tax::data())
+        .event_handler(Tax)
+        .await
         .map_err(DungeonBotError::from)?;
 
     info!("Done");

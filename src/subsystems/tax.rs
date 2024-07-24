@@ -22,7 +22,7 @@ impl Subsystem for Tax {
 
     async fn message_handler(ctx: &mut Context, msg: &Message) -> Result<()> {
 
-        let collect_tax = rand::thread_rng().gen::<f64>() > TAX_RATE;
+        let collect_tax = rand::thread_rng().gen::<f64>() < TAX_RATE;
 
         if collect_tax {
 
@@ -42,5 +42,19 @@ impl Subsystem for Tax {
         }
 
         Ok(())
+    }
+}
+
+use serenity::async_trait;
+
+#[async_trait]
+impl EventHandler for Tax {
+    async fn message(&self, mut ctx: Context, msg: Message) {
+
+        if msg.author.bot { return }
+
+        if let Err(err) = Self::message_handler(&mut ctx, &msg).await {
+            Self::error_handler(&mut ctx, &msg, err).await;
+        }
     }
 }

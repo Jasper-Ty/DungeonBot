@@ -1,7 +1,7 @@
 //! A subsystem of DungeonBot
 //!
 
-use serenity::{all::ClientBuilder, prelude::*};
+use serenity::prelude::*;
 
 use crate::error::{DungeonBotError, Result};
 
@@ -20,7 +20,7 @@ impl<T: Clone + Send + Sync + Sized + Default> Data for T {}
 
 pub trait SubsystemLock<T>: Data where T: Data {}
 
-use std::sync::Arc;
+use std::{error::Error, sync::Arc};
 
 #[derive(Debug, Clone, Default)]
 pub struct SyncRwLock<T: Data>(Arc<std::sync::RwLock<T>>);
@@ -78,12 +78,37 @@ where
             .cloned()
     }
 
-    fn install(client: ClientBuilder) -> ClientBuilder {
-        client.type_map_insert::<Self>(<Self as TypeMapKey>::Value::default())
+    fn data() -> <Self as TypeMapKey>::Value {
+        <Self as TypeMapKey>::Value::default()
     }
 
     #[allow(async_fn_in_trait, unused_variables)]
     async fn message_handler(ctx: &mut Context, msg: &Message) -> Result<()> {
         Ok(())
+    }
+
+    #[allow(async_fn_in_trait, unused_variables)]
+    async fn reaction_handler(ctx: &mut Context, msg: &Message) -> Result<()> {
+        Ok(())
+    }
+
+    #[allow(async_fn_in_trait)]
+    async fn error_handler(ctx: &mut Context, msg: &Message, err: DungeonBotError) {
+        let header = 
+            "Oh noes, an error \
+            <:flabbergasted:1250998996596555817>. \
+            Please let Jasper know about this immediately.\n";
+
+        let mut reply = header.to_string();
+        if let Ok(channel_id) = msg.channel(&ctx.http).await {
+            reply.push_str("```\n");
+            reply.push_str("[Subsystem Error]\n");
+            reply.push_str(&format!("{}\n", err));
+            reply.push_str(&format!("{:?}\n", err));
+            reply.push_str(&format!("{:?}\n", err.source()));
+            reply.push_str("```");
+            channel_id.id().say(&ctx.http, reply).await
+                .expect("Unable to send error handler reply");
+        }
     }
 }

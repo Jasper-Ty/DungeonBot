@@ -1,6 +1,6 @@
 use dotenvy::dotenv;
  
-use serenity::prelude::*;
+use serenity::{async_trait, prelude::*};
 use serenity::all::{ChannelId, Message, RoleId};
 
 use crate::db::{db_conn, DbUser};
@@ -67,12 +67,13 @@ impl Subsystem for Counting {
         let oldct = Self::get_lock_ct(ctx).await?;
         let is_next_value = newct == (oldct).rem_euclid(1000) + 1;
 
+        let connection = &mut db_conn()?;
+
         if is_next_value {
             // Set count behind lock
             Self::set_lock_ct(ctx, newct).await?;
 
             // Set saved count in db
-            let connection = &mut db_conn()?;
             Self::set_db_ct(connection, newct)?;
 
             if newct == 1000 {
@@ -90,6 +91,7 @@ impl Subsystem for Counting {
             msg.react(&ctx.http, '✅').await
                 .map_err(DungeonBotError::from)?;
         } else { 
+            DbUser::add_points(connection, msg.author.id.into(), -10)?;
             msg.react(&ctx.http, '❌').await
                 .map_err(DungeonBotError::from)?;
         }
@@ -145,10 +147,24 @@ impl Counting {
     pub fn set_db_ct(conn: &mut SqliteConnection, ct: u64) -> Result<usize> {
         use crate::db::schema::state::dsl::*;
 
-        diesel::update(state)
-            .filter(key.eq("COUNT"))
-            .set(value.eq(format!("{}", ct)))
-            .execute(conn)
-            .map_err(DungeonBotError::from)
+        {
+            diesel::update(state)
+                .filter(key.eq("COUNT"))
+                .set(value.eq(format!("{}", ct)))
+                .execute(conn)
+                .map_err(DungeonBotError::from)
+        }
+    }
+}
+
+#[async_trait]
+impl EventHandler for Counting {
+    async fn message(&self, mut ctx: Context, msg: Message) {
+
+        if msg.author.bot { return }
+
+        if let Err(err) = Self::message_handler(&mut ctx, &msg).await {
+            Self::error_handler(&mut ctx, &msg, err).await;
+        }
     }
 }
